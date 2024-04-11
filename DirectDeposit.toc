@@ -1,0 +1,16 @@
+## Interface: 100206
+## Title: DirectDeposit
+## Author: Van
+## Version: 0.5
+## IconTexture: Interface\AddOns\PetCompare\Media\Icons\DirectDeposit.jpeg
+
+libs\LibStub\LibStub.lua
+libs\LibSerialize\lib.xml
+libs\LibDeflate\lib.xml
+libs\AceComm-3.0\AceComm-3.0.xml
+libs\AceGUI-3.0\AceGUI-3.0.xml
+libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+
+DirectDeposit.lua
+
+# /run print((select(4, GetBuildInfo())));
