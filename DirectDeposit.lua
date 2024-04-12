@@ -10,7 +10,7 @@ DirectDepositEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
 DirectDepositEventFrame:SetScript("OnEvent", DirectDepositEventFrame.OnEvent);
 
 function SlashCmdList.DIRECTDEPOSIT(msg, editbox)
-    if(IsGuildLeader(UnitName("player")) or UnitName("player") == "Vandredor") then
+    if(IsGuildOfficer(UnitName("player")) or UnitName("player") == "Vandredor") then
     -- in the future if we want to move to officers can use C_GuildInfo.IsGuildOfficer() instead. Also could use a whitelist style
         print("Hey you are very important - either the GM or Van. Van's most important though.")
         DirectDepositEventFrame:CreateEditListWindow();
