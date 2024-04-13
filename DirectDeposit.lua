@@ -4,11 +4,10 @@ MyAddOn_Comms = {};
 SLASH_DIRECTDEPOSIT1 = "/dd"
 SLASH_DIRECTDEPOSIT2 = "/directdeposit"
 
-tinsert(UISpecialFrames, DirectDepositEventFrame:GetName())
+local selected, unselected = true, true
+local wishSelected, wishUnselected = true, true
 
--- UPDATE: for each expansion, go to wowhead and right click, view page source, look for "WH.Gatherer.addData" copy everything after addData (including the same line) until /script.
--- Open in notepad++, ctrl f and replace - search .*?"(\d+)":{"name_enus":"([^"]+)" as regex (bottom tick on) and use [$1] = "$2",\r\n for the replace with 
--- https://www.wowhead.com/items/trade-goods?filter=166:2;10:2;0:0
+tinsert(UISpecialFrames, DirectDepositEventFrame:GetName())
 
 -- remove duplicates from each of the locale tables
 for locale, items in pairs(LOCALE) do
@@ -58,16 +57,17 @@ end
 function SlashCmdList.DIRECTDEPOSIT(msg, editbox)
     -- if they enter edit, then check if they are the gm and open the edit window
     if strtrim(msg) == "edit" then
-        if(IsGuildLeader(UnitName("player")) or UnitName("player") == "Vandredor") then
-        -- TODO: want to check officer instead of GM
+        -- if(IsGuildLeader(UnitName("player")) or UnitName("player") == "Vandredor") then
+        if(C_GuildInfo.IsGuildOfficer() or UnitName("player") == "Vandredor") then
+        --if(C_GuildInfo.IsGuildOfficer()) then -- does not work for myself. need to test with officer, gm and gm alts.
             print("Hey you are very important - either the GM or Van. Van's most important though.")
-            DirectDepositEventFrame:CreateEditListWindow();
+            DirectDepositEventFrame:CreateWishList();
         else
-            print("You are not the guild leader")
+            print("You are not an officer.")
         end
     -- if they dont enter edit, then open the selection window
     else
-        DirectDepositEventFrame:CreateSelectionWindow();        
+        DirectDepositEventFrame:CreateDonationList();
     end
 end
 
@@ -76,7 +76,7 @@ function MyAddOn_Comms:Init()
     self:RegisterComm(self.Prefix, "OnCommReceived");
 end
 
-function DirectDepositEventFrame:CreateSelectionWindow()
+function DirectDepositEventFrame:CreateDonationList()
     -- Function to find an item in depositingItems by name
     local function findItem(name)
         for _, item in ipairs(depositingItems) do
@@ -122,10 +122,19 @@ function DirectDepositEventFrame:CreateSelectionWindow()
     end
 
     local function filterItems(searchTerm)
+        local depositingItemsLookup = {}
+        for _, item in ipairs(depositingItems) do
+            depositingItemsLookup[item.name] = item
+        end
+
         local filteredItems = {}
         for _, item in ipairs(requestedItems) do
             if string.find(item.name:lower(), searchTerm:lower()) then
-                table.insert(filteredItems, item)
+                local depItem = depositingItemsLookup[item.name]
+                local state = depItem and depItem.state or false
+                if (state and selected) or (not state and unselected) then
+                    table.insert(filteredItems, item)
+                end
             end
         end
         return filteredItems
@@ -143,27 +152,71 @@ function DirectDepositEventFrame:CreateSelectionWindow()
     frame:SetWidth(425)
     frame:SetHeight(500)
     frame:SetTitle("Donation List")
-    frame:SetStatusText("Created by Van on Garrosh.")
+    frame:SetStatusText("Created by Van on Garrosh for JFS.")
     frame:SetCallback("OnClose", function(widget)
         AceGUI:Release(widget)
     end)
     frame:SetLayout("Flow")
 
     local testContainer = AceGUI:Create("SimpleGroup")
-    testContainer:SetLayout("Fill")
+    testContainer:SetLayout("Flow")
     testContainer:SetFullHeight(true)
     testContainer:SetFullWidth(true)
     frame:AddChild(testContainer);
 
     local scrollContainer = AceGUI:Create("ScrollFrame")
     scrollContainer:SetLayout("List");
-    scrollContainer:SetFullHeight(true) 
+    scrollContainer:SetFullHeight(true)
+    scrollContainer:SetFullWidth(true)
+
+    -- Add a section header for the filters
+    local filterHeader = AceGUI:Create("Label")
+    filterHeader:SetFontObject(GameFontNormalLarge)
+    filterHeader:SetColor(0.4, 0.6, 1) -- Change font color (light blue)
+    filterHeader:SetText("Filters")
+    filterHeader:SetFullWidth(true)
+    testContainer:AddChild(filterHeader)
 
     -- Create a search box
     local searchBox = AceGUI:Create("EditBox")
     searchBox:SetLabel("Search")
     searchBox:SetWidth(200)
-    scrollContainer:AddChild(searchBox)
+
+    local selectedCheckbox = AceGUI:Create("CheckBox")
+    selectedCheckbox:SetLabel("Selected")
+    selectedCheckbox:SetValue(selected)
+    selectedCheckbox:SetCallback("OnValueChanged", function(_, _, value)
+        selected = value
+        checkboxContainer:ReleaseChildren()
+        C_Timer.After(0.1, function()
+            local filteredItems = filterItems(searchBox:GetText())
+            populateItems(filteredItems)
+        end)
+    end)
+    testContainer:AddChild(selectedCheckbox)
+
+    local unselectedCheckbox = AceGUI:Create("CheckBox")
+    unselectedCheckbox:SetLabel("Unselected")
+    unselectedCheckbox:SetValue(unselected)
+    unselectedCheckbox:SetCallback("OnValueChanged", function(_, _, value)
+        unselected = value
+        checkboxContainer:ReleaseChildren()
+        C_Timer.After(0.1, function()
+            local filteredItems = filterItems(searchBox:GetText())
+            populateItems(filteredItems)
+        end)
+    end)
+    testContainer:AddChild(unselectedCheckbox)
+
+    testContainer:AddChild(searchBox)
+
+    -- Add a section header for the items
+    local itemsHeader = AceGUI:Create("Label")
+    itemsHeader:SetFontObject(GameFontNormalLarge)
+    itemsHeader:SetColor(0.4, 0.6, 1) -- Change font color (light blue)
+    itemsHeader:SetText("Items")
+    itemsHeader:SetFullWidth(true)
+    testContainer:AddChild(itemsHeader)
 
     searchBox:SetCallback("OnTextChanged", function(_, _, value)
         checkboxContainer:ReleaseChildren()
@@ -177,7 +230,7 @@ function DirectDepositEventFrame:CreateSelectionWindow()
     testContainer:AddChild(scrollContainer)
 end
 
-function DirectDepositEventFrame:CreateEditListWindow()
+function DirectDepositEventFrame:CreateWishList()
     local tradeGoods
     local locale = GetLocale()
     -- en_US, en_GB
@@ -250,10 +303,18 @@ function DirectDepositEventFrame:CreateEditListWindow()
     end
 
     local function filterItems(searchTerm)
+        local requestedItemsLookup = {}
+        for _, item in ipairs(requestedItems) do
+            requestedItemsLookup[item.name] = item.state
+        end
+    
         local filteredItems = {}
         for id, name in pairs(tradeGoods) do
             if string.find(name:lower(), searchTerm:lower()) then
-                filteredItems[id] = name
+                local state = requestedItemsLookup[name] or false
+                if (state and wishSelected) or ((not state) and wishUnselected) then
+                    filteredItems[id] = name
+                end
             end
         end
         return filteredItems
@@ -271,14 +332,14 @@ function DirectDepositEventFrame:CreateEditListWindow()
     frame:SetWidth(425)
     frame:SetHeight(500)
     frame:SetTitle("Wish List")
-    frame:SetStatusText("Created by Van on Garrosh.")
+    frame:SetStatusText("Created by Van on Garrosh for JFS.")
     frame:SetCallback("OnClose", function(widget)
         AceGUI:Release(widget)
     end)
     frame:SetLayout("Flow")
 
     local testContainer = AceGUI:Create("SimpleGroup")
-    testContainer:SetLayout("Fill")
+    testContainer:SetLayout("Flow")
     testContainer:SetFullHeight(true)
     testContainer:SetFullWidth(true)
     frame:AddChild(testContainer);
@@ -286,12 +347,56 @@ function DirectDepositEventFrame:CreateEditListWindow()
     local scrollContainer = AceGUI:Create("ScrollFrame")
     scrollContainer:SetLayout("List");
     scrollContainer:SetFullHeight(true)
-    
+    scrollContainer:SetFullWidth(true)
+
+    -- Add a section header for the filters
+    local filterHeader = AceGUI:Create("Label")
+    filterHeader:SetFontObject(GameFontNormalLarge)
+    filterHeader:SetColor(0.4, 0.6, 1) -- Change font color (light blue)
+    filterHeader:SetText("Filters")
+    filterHeader:SetFullWidth(true)
+    testContainer:AddChild(filterHeader)
+
     -- Create a search box
     local searchBox = AceGUI:Create("EditBox")
     searchBox:SetLabel("Search")
     searchBox:SetWidth(200)
-    scrollContainer:AddChild(searchBox)
+
+    local selectedCheckbox = AceGUI:Create("CheckBox")
+    selectedCheckbox:SetLabel("Selected")
+    selectedCheckbox:SetValue(wishSelected)
+    selectedCheckbox:SetCallback("OnValueChanged", function(_, _, value)
+        wishSelected = value
+        checkboxContainer:ReleaseChildren()
+        C_Timer.After(0.1, function()
+            local filteredItems = filterItems(searchBox:GetText())
+            populateItems(filteredItems)
+        end)
+    end)
+    testContainer:AddChild(selectedCheckbox)
+
+    local unselectedCheckbox = AceGUI:Create("CheckBox")
+    unselectedCheckbox:SetLabel("Unselected")
+    unselectedCheckbox:SetValue(wishUnselected)
+    unselectedCheckbox:SetCallback("OnValueChanged", function(_, _, value)
+        wishUnselected = value
+        checkboxContainer:ReleaseChildren()
+        C_Timer.After(0.1, function()
+            local filteredItems = filterItems(searchBox:GetText())
+            populateItems(filteredItems)
+        end)
+    end)
+    testContainer:AddChild(unselectedCheckbox)
+    
+    testContainer:AddChild(searchBox)
+
+    -- Add a section header for the items
+    local itemsHeader = AceGUI:Create("Label")
+    itemsHeader:SetFontObject(GameFontNormalLarge)
+    itemsHeader:SetColor(0.4, 0.6, 1) -- Change font color (light blue)
+    itemsHeader:SetText("Items")
+    itemsHeader:SetFullWidth(true)
+    testContainer:AddChild(itemsHeader)
 
     searchBox:SetCallback("OnTextChanged", function(_, _, value)
         checkboxContainer:ReleaseChildren()
