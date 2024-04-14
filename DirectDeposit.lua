@@ -50,7 +50,7 @@ end
 
 function MyAddOn_CommsDirectDeposit:Distribute()
     -- Get the current timestamp
-    local timestamp = time()
+    timestamp = time()
 
     -- Prepare the data to be sent
     local dataToSend = {
@@ -72,6 +72,92 @@ function MyAddOn_CommsDirectDeposit:Distribute()
 
 end
 
+function DirectDepositEventFrame:export()
+    -- Get the current timestamp
+    local timestamp = time()
+
+    -- Prepare the data to be sent
+    local dataToSend = {
+        timestamp = timestamp,
+        requestedItems = requestedItems
+    }
+
+    local serializedString = Serializer:Serialize(dataToSend)
+    local compressedData = Deflater:CompressDeflate(serializedString)
+    local encodedString = Deflater:EncodeForPrint(compressedData)
+
+    local frame = AceGUI:Create("Frame")
+    frame:SetTitle("Export Data")
+    frame:SetWidth(400)
+    frame:SetHeight(200)
+
+    local editBox = AceGUI:Create("MultiLineEditBox")
+    editBox:SetText(encodedString)
+    editBox:SetFullWidth(true)
+    editBox.button:Hide()  -- hide the accept button
+    frame:AddChild(editBox)
+
+    -- Add the frame as a global variable under the name `DirectDepositExportFrame`
+    _G["DirectDepositExportFrame"] = frame.frame
+    -- Register the global variable `DirectDepositExportFrame` as a "special frame"
+    -- so that it is closed when the escape key is pressed.
+    tinsert(UISpecialFrames, "DirectDepositExportFrame")
+end
+
+function DirectDepositEventFrame:import(callback)
+    local frame = AceGUI:Create("Frame")
+    frame:SetTitle("Import Data")
+    frame:SetWidth(400)
+    frame:SetHeight(200)
+
+    local editBox = AceGUI:Create("MultiLineEditBox")
+    editBox:SetFullWidth(true)
+    editBox.button:Hide()  -- hide the accept button
+    frame:AddChild(editBox)
+
+    local button = AceGUI:Create("Button")
+    button:SetText("Import")
+    button:SetCallback("OnClick", function()
+        local data = editBox:GetText()
+        local compressedData = Deflater:DecodeForPrint(data)
+        local serializedString = Deflater:DecompressDeflate(compressedData)
+        local success, dataPassed = Serializer:Deserialize(serializedString)
+        if success then
+            -- Only overwrite if the passed timestamp is higher than the current one
+            if dataPassed.timestamp > timestamp then
+                requestedItems = dataPassed.requestedItems
+                timestamp = dataPassed.timestamp
+                for i, depositItem in ipairs(depositingItems) do
+                    -- Assume the item is not in the new requestedItems
+                    local found = false
+                    -- Check if the item is in the new requestedItems
+                    for j, requestItem in ipairs(requestedItems) do
+                        if depositItem.name == requestItem.name then
+                            found = true
+                            break
+                        end
+                    end
+                    -- If the item is not in the new requestedItems, set its state to false
+                    if not found then
+                        depositItem.state = false
+                    end
+                end
+                print("Import successful!")
+            else
+                print("Failed to import data. Your version is newer.")
+            end
+        else
+            print("Failed to import data. Please try again with a valid import.")
+        end
+        frame:Release()
+        -- Call the callback function after frame is closed
+        if callback then
+            callback()
+        end
+    end)
+    frame:AddChild(button)
+end
+
 function MyAddOn_CommsDirectDeposit:OnCommReceived(passedPrefix, msg, distribution, sender)
     if (passedPrefix == myPrefixDirectDeposit) then
         -- Decode the received message
@@ -85,7 +171,11 @@ function MyAddOn_CommsDirectDeposit:OnCommReceived(passedPrefix, msg, distributi
         if not success then
             print("Deserialization error: ", dataReceived) -- In case of an error, dataReceived is the error message
         else
-            print("Received data: ", tprint(dataReceived))
+            if dataReceived.timestamp > timestamp then
+                print("Received data: ", tprint(dataReceived))
+            else
+                print("Failed to update data. Your version is newer.")
+            end
         end
     end
 end
@@ -127,29 +217,6 @@ function DirectDepositEventFrame:LoadSavedVariables()
     if timestamp == nil then
         timestamp = 0
     end
-end
-
-function DirectDepositEventFrame:export()
-    local serializedString = Serializer:Serialize(requestedItems)
-    local compressedData = Deflater:CompressDeflate(serializedString)
-    local encodedString = Deflater:EncodeForPrint(compressedData)
-
-    local frame = AceGUI:Create("Frame")
-    frame:SetTitle("Export Data")
-    frame:SetWidth(400)
-    frame:SetHeight(200)
-
-    local editBox = AceGUI:Create("MultiLineEditBox")
-    editBox:SetText(encodedString)
-    editBox:SetFullWidth(true)
-    editBox.button:Hide()  -- hide the accept button
-    frame:AddChild(editBox)
-
-    -- Add the frame as a global variable under the name `DirectDepositEventFrameGlobal`
-    _G["DirectDepositEventFrameGlobal"] = frame.frame
-    -- Register the global variable `DirectDepositEventFrameGlobal` as a "special frame"
-    -- so that it is closed when the escape key is pressed.
-    tinsert(UISpecialFrames, "DirectDepositEventFrameGlobal")
 end
 
 function DirectDepositEventFrame:CreateWishList()
@@ -505,7 +572,7 @@ function DirectDepositEventFrame:CreateDonationList()
     local itemsHeader = AceGUI:Create("Label")
     itemsHeader:SetFontObject(GameFontNormalLarge)
     itemsHeader:SetColor(0.4, 0.6, 1) -- Change font color (light blue)
-    itemsHeader:SetText("Items")
+    itemsHeader:SetText("Items - " .. timestamp)
     itemsHeader:SetFullWidth(true)
     testContainer:AddChild(itemsHeader)
 
@@ -519,55 +586,6 @@ function DirectDepositEventFrame:CreateDonationList()
     populateItems(requestedItems)
     scrollContainer:AddChild(checkboxContainer)
     testContainer:AddChild(scrollContainer)
-end
-
-function DirectDepositEventFrame:import(callback)
-    local frame = AceGUI:Create("Frame")
-    frame:SetTitle("Import Data")
-    frame:SetWidth(400)
-    frame:SetHeight(200)
-
-    local editBox = AceGUI:Create("MultiLineEditBox")
-    editBox:SetFullWidth(true)
-    editBox.button:Hide()  -- hide the accept button
-    frame:AddChild(editBox)
-
-    local button = AceGUI:Create("Button")
-    button:SetText("Import")
-    button:SetCallback("OnClick", function()
-        local data = editBox:GetText()
-        local compressedData = Deflater:DecodeForPrint(data)
-        local serializedString = Deflater:DecompressDeflate(compressedData)
-        local success, requestedItemsPassed = Serializer:Deserialize(serializedString)
-        if success then
-            requestedItems = requestedItemsPassed
-            print(tprint(requestedItemsPassed))
-            for i, depositItem in ipairs(depositingItems) do
-                -- Assume the item is not in the new requestedItems
-                local found = false
-                -- Check if the item is in the new requestedItems
-                for j, requestItem in ipairs(requestedItems) do
-                    if depositItem.name == requestItem.name then
-                        found = true
-                        break
-                    end
-                end
-                -- If the item is not in the new requestedItems, set its state to false
-                if not found then
-                    depositItem.state = false
-                end
-            end
-            print("Import successful!")
-        else
-            print("Failed to import data. Please try again with a valid import.")
-        end
-        frame:Release()
-        -- Call the callback function after frame is closed
-        if callback then
-            callback()
-        end
-    end)
-    frame:AddChild(button)
 end
 
 function SlashCmdList.DIRECTDEPOSIT(msg, editbox)
