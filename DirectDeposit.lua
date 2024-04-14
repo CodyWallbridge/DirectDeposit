@@ -90,65 +90,6 @@ function MyAddOn_CommsDirectDeposit:OnCommReceived(passedPrefix, msg, distributi
     end
 end
 
--- remove duplicates from each of the locale tables
-for locale, items in pairs(LOCALE) do
-    local uniqueItems = {}
-    local uniqueNames = {}
-    for id, name in pairs(items) do
-        if not uniqueNames[name] then
-            uniqueItems[id] = name
-            uniqueNames[name] = true
-        end
-    end
-    LOCALE[locale] = uniqueItems
-end
-
-function DirectDepositEventFrame:OnEvent(event, text)
-    if(event == "PLAYER_ENTERING_WORLD") then
-		DirectDepositEventFrame:onLoad();
-    elseif(event == "ADDON_LOADED") then
-        if(text == "DirectDeposit") then
-            DirectDepositEventFrame:LoadSavedVariables();
-        end
-	end
-end
-
-DirectDepositEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
-DirectDepositEventFrame:RegisterEvent("ADDON_LOADED")
-DirectDepositEventFrame:SetScript("OnEvent", DirectDepositEventFrame.OnEvent);
-
-function DirectDepositEventFrame:LoadSavedVariables()
-    if depositingItems == nil then
-        depositingItems = {}
-    end
-    if requestedItems == nil then
-        requestedItems = {}
-    end
-end
-
-function DirectDepositEventFrame:export()
-    local serializedString = Serializer:Serialize(requestedItems)
-    local compressedData = Deflater:CompressDeflate(serializedString)
-    local encodedString = Deflater:EncodeForPrint(compressedData)
-
-    local frame = AceGUI:Create("Frame")
-    frame:SetTitle("Export Data")
-    frame:SetWidth(400)
-    frame:SetHeight(200)
-
-    local editBox = AceGUI:Create("MultiLineEditBox")
-    editBox:SetText(encodedString)
-    editBox:SetFullWidth(true)
-    editBox.button:Hide()  -- hide the accept button
-    frame:AddChild(editBox)
-
-    -- Add the frame as a global variable under the name `DirectDepositEventFrameGlobal`
-    _G["DirectDepositEventFrameGlobal"] = frame.frame
-    -- Register the global variable `DirectDepositEventFrameGlobal` as a "special frame"
-    -- so that it is closed when the escape key is pressed.
-    tinsert(UISpecialFrames, "DirectDepositEventFrameGlobal")
-end
-
 function DirectDepositEventFrame:import()
     local frame = AceGUI:Create("Frame")
     frame:SetTitle("Import Data")
@@ -191,6 +132,68 @@ function DirectDepositEventFrame:import()
         frame:Release()
     end)
     frame:AddChild(button)
+end
+
+-- remove duplicates from each of the locale tables
+for locale, items in pairs(LOCALE) do
+    local uniqueItems = {}
+    local uniqueNames = {}
+    for id, name in pairs(items) do
+        if not uniqueNames[name] then
+            uniqueItems[id] = name
+            uniqueNames[name] = true
+        end
+    end
+    LOCALE[locale] = uniqueItems
+end
+
+function DirectDepositEventFrame:OnEvent(event, text)
+    if(event == "PLAYER_ENTERING_WORLD") then
+		DirectDepositEventFrame:onLoad();
+    elseif(event == "ADDON_LOADED") then
+        if(text == "DirectDeposit") then
+            DirectDepositEventFrame:LoadSavedVariables();
+        end
+	end
+end
+
+DirectDepositEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
+DirectDepositEventFrame:RegisterEvent("ADDON_LOADED")
+DirectDepositEventFrame:SetScript("OnEvent", DirectDepositEventFrame.OnEvent);
+
+function DirectDepositEventFrame:LoadSavedVariables()
+    if depositingItems == nil then
+        depositingItems = {}
+    end
+    if requestedItems == nil then
+        requestedItems = {}
+    end
+    if timestamp == nil then
+        timestamp = 0
+    end
+end
+
+function DirectDepositEventFrame:export()
+    local serializedString = Serializer:Serialize(requestedItems)
+    local compressedData = Deflater:CompressDeflate(serializedString)
+    local encodedString = Deflater:EncodeForPrint(compressedData)
+
+    local frame = AceGUI:Create("Frame")
+    frame:SetTitle("Export Data")
+    frame:SetWidth(400)
+    frame:SetHeight(200)
+
+    local editBox = AceGUI:Create("MultiLineEditBox")
+    editBox:SetText(encodedString)
+    editBox:SetFullWidth(true)
+    editBox.button:Hide()  -- hide the accept button
+    frame:AddChild(editBox)
+
+    -- Add the frame as a global variable under the name `DirectDepositEventFrameGlobal`
+    _G["DirectDepositEventFrameGlobal"] = frame.frame
+    -- Register the global variable `DirectDepositEventFrameGlobal` as a "special frame"
+    -- so that it is closed when the escape key is pressed.
+    tinsert(UISpecialFrames, "DirectDepositEventFrameGlobal")
 end
 
 function DirectDepositEventFrame:CreateWishList()
