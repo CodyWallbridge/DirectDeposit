@@ -2,6 +2,7 @@
 ## Title: DirectDeposit
 ## Author: Van
 ## Version: 0.5
+## SavedVariablesPerCharacter: depositingItems, requestedItems
 ## IconTexture: Interface\AddOns\PetCompare\Media\Icons\DirectDeposit.jpeg
 
 libs\LibStub\LibStub.lua
@@ -11,6 +12,7 @@ libs\AceComm-3.0\AceComm-3.0.xml
 libs\AceGUI-3.0\AceGUI-3.0.xml
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 
+Locales.lua
 DirectDeposit.lua
 
 # /run print((select(4, GetBuildInfo())));
