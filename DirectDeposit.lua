@@ -90,50 +90,6 @@ function MyAddOn_CommsDirectDeposit:OnCommReceived(passedPrefix, msg, distributi
     end
 end
 
-function DirectDepositEventFrame:import()
-    local frame = AceGUI:Create("Frame")
-    frame:SetTitle("Import Data")
-    frame:SetWidth(400)
-    frame:SetHeight(200)
-
-    local editBox = AceGUI:Create("MultiLineEditBox")
-    editBox:SetFullWidth(true)
-    editBox.button:Hide()  -- hide the accept button
-    frame:AddChild(editBox)
-
-    local button = AceGUI:Create("Button")
-    button:SetText("Import")
-    button:SetCallback("OnClick", function()
-        local data = editBox:GetText()
-        local compressedData = Deflater:DecodeForPrint(data)
-        local serializedString = Deflater:DecompressDeflate(compressedData)
-        local success, requestedItems = Serializer:Deserialize(serializedString)
-        if success then
-            requestedItems = requestedItems
-            for i, depositItem in ipairs(depositingItems) do
-                -- Assume the item is not in the new requestedItems
-                local found = false
-                -- Check if the item is in the new requestedItems
-                for j, requestItem in ipairs(requestedItems) do
-                    if depositItem.name == requestItem.name then
-                        found = true
-                        break
-                    end
-                end
-                -- If the item is not in the new requestedItems, set its state to false
-                if not found then
-                    depositItem.state = false
-                end
-            end
-            print("Import successful!")
-        else
-            print("Failed to import data. Please try again with a valid import.")
-        end
-        frame:Release()
-    end)
-    frame:AddChild(button)
-end
-
 -- remove duplicates from each of the locale tables
 for locale, items in pairs(LOCALE) do
     local uniqueItems = {}
@@ -243,7 +199,7 @@ function DirectDepositEventFrame:CreateWishList()
             local checkbox = AceGUI:Create("CheckBox")
             checkbox:SetLabel(name)
 
-            -- if the item is in requestedItems, its state is true, otherwise it is false
+            -- if the items being requested and the state is true, set to true
             if isItemRequested(name) then
                 checkbox:SetValue(true)
             else
@@ -416,29 +372,31 @@ function DirectDepositEventFrame:CreateDonationList()
 
     local function populateItems(items)
         for _, item in ipairs(items) do
-            local checkbox = AceGUI:Create("CheckBox")
-            checkbox:SetLabel(item.name)
+            if item.state == true then
+                local checkbox = AceGUI:Create("CheckBox")
+                checkbox:SetLabel(item.name)
 
-            -- Find the item in depositingItems and use its state as the initial value
-            local depositingItem = findItem(item.name)
-            if depositingItem then
-                checkbox:SetValue(depositingItem.state or false)
-            else
-                checkbox:SetValue(false)
-            end
-
-            checkbox:SetCallback("OnValueChanged", function(_, _, value)
-                -- Find the item in depositingItems
+                -- Find the item in depositingItems and use its state as the initial value
                 local depositingItem = findItem(item.name)
                 if depositingItem then
-                    -- If the item is found, update its state
-                    depositingItem.state = value
+                    checkbox:SetValue(depositingItem.state)
                 else
-                    -- If the item is not found, add it to depositingItems with the new state
-                    table.insert(depositingItems, {name = item.name, state = value})
+                    checkbox:SetValue(false)
                 end
-            end)
-            checkboxContainer:AddChild(checkbox)
+
+                checkbox:SetCallback("OnValueChanged", function(_, _, value)
+                    -- Find the item in depositingItems
+                    local depositingItem = findItem(item.name)
+                    if depositingItem then
+                        -- If the item is found, update its state
+                        depositingItem.state = value
+                    else
+                        -- If the item is not found, add it to depositingItems with the new state
+                        table.insert(depositingItems, {name = item.name, state = value})
+                    end
+                end)
+                checkboxContainer:AddChild(checkbox)
+            end
         end
     end
 
@@ -507,7 +465,11 @@ function DirectDepositEventFrame:CreateDonationList()
     local importButton = AceGUI:Create("Button")
     importButton:SetText("Import")
     importButton:SetCallback("OnClick", function()
-        DirectDepositEventFrame:import()
+        DirectDepositEventFrame:import(function()
+            checkboxContainer:ReleaseChildren()
+            local filteredItems = filterItems(searchBox:GetText())
+            populateItems(filteredItems)
+        end)
     end)
     testContainer:AddChild(importButton)
 
@@ -557,6 +519,55 @@ function DirectDepositEventFrame:CreateDonationList()
     populateItems(requestedItems)
     scrollContainer:AddChild(checkboxContainer)
     testContainer:AddChild(scrollContainer)
+end
+
+function DirectDepositEventFrame:import(callback)
+    local frame = AceGUI:Create("Frame")
+    frame:SetTitle("Import Data")
+    frame:SetWidth(400)
+    frame:SetHeight(200)
+
+    local editBox = AceGUI:Create("MultiLineEditBox")
+    editBox:SetFullWidth(true)
+    editBox.button:Hide()  -- hide the accept button
+    frame:AddChild(editBox)
+
+    local button = AceGUI:Create("Button")
+    button:SetText("Import")
+    button:SetCallback("OnClick", function()
+        local data = editBox:GetText()
+        local compressedData = Deflater:DecodeForPrint(data)
+        local serializedString = Deflater:DecompressDeflate(compressedData)
+        local success, requestedItemsPassed = Serializer:Deserialize(serializedString)
+        if success then
+            requestedItems = requestedItemsPassed
+            print(tprint(requestedItemsPassed))
+            for i, depositItem in ipairs(depositingItems) do
+                -- Assume the item is not in the new requestedItems
+                local found = false
+                -- Check if the item is in the new requestedItems
+                for j, requestItem in ipairs(requestedItems) do
+                    if depositItem.name == requestItem.name then
+                        found = true
+                        break
+                    end
+                end
+                -- If the item is not in the new requestedItems, set its state to false
+                if not found then
+                    depositItem.state = false
+                end
+            end
+            print("Import successful!")
+        else
+            print("Failed to import data. Please try again with a valid import.")
+        end
+        frame:Release()
+        -- Call the callback function after frame is closed
+        if callback then
+            callback()
+        end
+    end)
+    frame:AddChild(button)
 end
 
 function SlashCmdList.DIRECTDEPOSIT(msg, editbox)
