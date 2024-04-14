@@ -76,6 +76,12 @@ function MyAddOn_Comms:Init()
     self:RegisterComm(self.Prefix, "OnCommReceived");
 end
 
+function MyAddOn_Comms:OnCommReceived(passedPrefix, msg, distribution, sender)
+    if (passedPrefix == myPrefix) then
+        print("sure")
+    end--if
+end
+
 function DirectDepositEventFrame:CreateDonationList()
     -- Function to find an item in depositingItems by name
     local function findItem(name)
