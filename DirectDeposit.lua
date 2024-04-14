@@ -9,9 +9,17 @@ local wishSelected, wishUnselected = true, true
 
 tinsert(UISpecialFrames, DirectDepositEventFrame:GetName())
 
-function MyAddOn_CommsDirectDeposit:Init()
-    AceComm:Embed(self)
-    self:RegisterComm(self.Prefix, "OnCommReceived")
+-- remove duplicates from each of the locale tables
+for locale, items in pairs(LOCALE) do
+    local uniqueItems = {}
+    local uniqueNames = {}
+    for id, name in pairs(items) do
+        if not uniqueNames[name] then
+            uniqueItems[id] = name
+            uniqueNames[name] = true
+        end
+    end
+    LOCALE[locale] = uniqueItems
 end
 
 local function tprint (tbl, indent)
@@ -39,39 +47,6 @@ local function tprint (tbl, indent)
     return toprnt
 end
 
-function DirectDepositEventFrame:onLoad()
-    Serializer = LibStub("LibSerialize");
-	Deflater = LibStub("LibDeflate");
-	AceGUI = LibStub("AceGUI-3.0");
-	AceComm = LibStub:GetLibrary("AceComm-3.0");
-	MyAddOn_CommsDirectDeposit.Prefix = myPrefixDirectDeposit;
-	MyAddOn_CommsDirectDeposit:Init();
-end
-
-function MyAddOn_CommsDirectDeposit:Distribute()
-    -- Get the current timestamp
-    timestamp = time()
-
-    -- Prepare the data to be sent
-    local dataToSend = {
-        timestamp = timestamp,
-        requestedItems = requestedItems
-    }
-
-    -- -- Serialize the data
-    local serializedString = Serializer:Serialize(dataToSend)
-
-    -- Compress the serialized data
-    local compressedData = Deflater:CompressDeflate(serializedString)
-
-    -- Encode the compressed data for transmission
-    local encodedString, err = Deflater:EncodeForWoWAddonChannel(compressedData)
-
-    -- Send the encoded data to the guild channel
-    self:SendCommMessage(myPrefixDirectDeposit, encodedString, "GUILD")
-
-end
-
 function DirectDepositEventFrame:export()
     -- Get the current timestamp
     local timestamp = time()
@@ -82,16 +57,16 @@ function DirectDepositEventFrame:export()
         requestedItems = requestedItems
     }
 
-    local serializedString = Serializer:Serialize(dataToSend)
-    local compressedData = Deflater:CompressDeflate(serializedString)
-    local encodedString = Deflater:EncodeForPrint(compressedData)
+    local serializedString = SerializerDirectDeposit:Serialize(dataToSend)
+    local compressedData = DeflaterDirectDeposit:CompressDeflate(serializedString)
+    local encodedString = DeflaterDirectDeposit:EncodeForPrint(compressedData)
 
-    local frame = AceGUI:Create("Frame")
+    local frame = AceGUIDirectDeposit:Create("Frame")
     frame:SetTitle("Export Data")
     frame:SetWidth(400)
     frame:SetHeight(200)
 
-    local editBox = AceGUI:Create("MultiLineEditBox")
+    local editBox = AceGUIDirectDeposit:Create("MultiLineEditBox")
     editBox:SetText(encodedString)
     editBox:SetFullWidth(true)
     editBox.button:Hide()  -- hide the accept button
@@ -105,23 +80,23 @@ function DirectDepositEventFrame:export()
 end
 
 function DirectDepositEventFrame:import(callback)
-    local frame = AceGUI:Create("Frame")
+    local frame = AceGUIDirectDeposit:Create("Frame")
     frame:SetTitle("Import Data")
     frame:SetWidth(400)
     frame:SetHeight(200)
 
-    local editBox = AceGUI:Create("MultiLineEditBox")
+    local editBox = AceGUIDirectDeposit:Create("MultiLineEditBox")
     editBox:SetFullWidth(true)
     editBox.button:Hide()  -- hide the accept button
     frame:AddChild(editBox)
 
-    local button = AceGUI:Create("Button")
+    local button = AceGUIDirectDeposit:Create("Button")
     button:SetText("Import")
     button:SetCallback("OnClick", function()
         local data = editBox:GetText()
-        local compressedData = Deflater:DecodeForPrint(data)
-        local serializedString = Deflater:DecompressDeflate(compressedData)
-        local success, dataPassed = Serializer:Deserialize(serializedString)
+        local compressedData = DeflaterDirectDeposit:DecodeForPrint(data)
+        local serializedString = DeflaterDirectDeposit:DecompressDeflate(compressedData)
+        local success, dataPassed = SerializerDirectDeposit:Deserialize(serializedString)
         if success then
             -- Only overwrite if the passed timestamp is higher than the current one
             if dataPassed.timestamp > timestamp then
@@ -158,21 +133,57 @@ function DirectDepositEventFrame:import(callback)
     frame:AddChild(button)
 end
 
+function MyAddOn_CommsDirectDeposit:Init()
+    AceCommDirectDeposit:Embed(self)
+    self:RegisterComm(self.Prefix, "OnCommReceived")
+end
+
+function MyAddOn_CommsDirectDeposit:Distribute()
+    -- Get the current timestamp
+    timestamp = time()
+
+    -- Prepare the data to be sent
+    local dataToSend = {
+        type = "Distribute",
+        timestamp = timestamp,
+        requestedItems = requestedItems
+    }
+
+    -- Serialize the data
+    local serializedString = SerializerDirectDeposit:Serialize(dataToSend)
+
+    -- Compress the serialized data
+    local compressedData = DeflaterDirectDeposit:CompressDeflate(serializedString)
+
+    -- Encode the compressed data for transmission
+    local encodedString, err = DeflaterDirectDeposit:EncodeForWoWAddonChannel(compressedData)
+
+    -- Send the encoded data to the guild channel
+    self:SendCommMessage(myPrefixDirectDeposit, encodedString, "GUILD")
+
+end
+
 function MyAddOn_CommsDirectDeposit:OnCommReceived(passedPrefix, msg, distribution, sender)
     if (passedPrefix == myPrefixDirectDeposit) then
         -- Decode the received message
-        local decodedString, err = Deflater:DecodeForWoWAddonChannel(msg)
+        local decodedString, err = DeflaterDirectDeposit:DecodeForWoWAddonChannel(msg)
 
         -- Decompress the decoded string
-        local decompressedData, err = Deflater:DecompressDeflate(decodedString)
+        local decompressedData, err = DeflaterDirectDeposit:DecompressDeflate(decodedString)
 
         -- Deserialize the decompressed data
-        local success, dataReceived = Serializer:Deserialize(decompressedData)
+        local success, dataReceived = SerializerDirectDeposit:Deserialize(decompressedData)
         if not success then
             print("Deserialization error: ", dataReceived) -- In case of an error, dataReceived is the error message
         else
             if dataReceived.timestamp > timestamp then
-                print("Received data: ", tprint(dataReceived))
+                if dataReceived.type == "Distribute" then
+                    print("received distribute")
+                elseif dataReceived.type == "Loaded" then
+                    print("received loaded")
+                else
+                    print("received something else: " .. dataReceived.type)
+                end
             else
                 print("Failed to update data. Your version is newer.")
             end
@@ -180,25 +191,47 @@ function MyAddOn_CommsDirectDeposit:OnCommReceived(passedPrefix, msg, distributi
     end
 end
 
--- remove duplicates from each of the locale tables
-for locale, items in pairs(LOCALE) do
-    local uniqueItems = {}
-    local uniqueNames = {}
-    for id, name in pairs(items) do
-        if not uniqueNames[name] then
-            uniqueItems[id] = name
-            uniqueNames[name] = true
-        end
-    end
-    LOCALE[locale] = uniqueItems
+function DirectDepositEventFrame:onLoad()
+    SerializerDirectDeposit = LibStub("LibSerialize");
+	DeflaterDirectDeposit = LibStub("LibDeflate");
+	AceGUIDirectDeposit = LibStub("AceGUI-3.0");
+	AceCommDirectDeposit = LibStub:GetLibrary("AceComm-3.0");
+	MyAddOn_CommsDirectDeposit.Prefix = myPrefixDirectDeposit;
+	MyAddOn_CommsDirectDeposit:Init();
 end
 
 function DirectDepositEventFrame:OnEvent(event, text)
     if(event == "PLAYER_ENTERING_WORLD") then
-		DirectDepositEventFrame:onLoad();
+        if not SerializerDirectDeposit then
+            DirectDepositEventFrame:onLoad();
+        end
     elseif(event == "ADDON_LOADED") then
         if(text == "DirectDeposit") then
             DirectDepositEventFrame:LoadSavedVariables();
+
+            if not SerializerDirectDeposit then
+                DirectDepositEventFrame:onLoad();
+            end
+
+            -- Prepare the data to be sent
+            local dataToSend = {
+                type = "Loaded",
+                timestamp = timestamp,
+                requestedItems = requestedItems
+            }
+        
+            -- Serialize the data
+            local serializedString = SerializerDirectDeposit:Serialize(dataToSend)
+        
+            -- Compress the serialized data
+            local compressedData = DeflaterDirectDeposit:CompressDeflate(serializedString)
+        
+            -- Encode the compressed data for transmission
+            local encodedString, err = DeflaterDirectDeposit:EncodeForWoWAddonChannel(compressedData)
+        
+            -- Send the encoded data to the guild channel
+            MyAddOn_CommsDirectDeposit:SendCommMessage(myPrefixDirectDeposit, encodedString, "GUILD")
+            print("sent the data on addon loaded for direct deposit")
         end
 	end
 end
@@ -256,14 +289,14 @@ function DirectDepositEventFrame:CreateWishList()
     end
 
     -- Create a separate container for the checkboxes
-    local checkboxContainer = AceGUI:Create("SimpleGroup")
+    local checkboxContainer = AceGUIDirectDeposit:Create("SimpleGroup")
     checkboxContainer:SetFullWidth(true)
     checkboxContainer:SetFullHeight(true)
     checkboxContainer:SetLayout("Flow")
 
     local function populateItems(items)
         for id, name in pairs(items) do
-            local checkbox = AceGUI:Create("CheckBox")
+            local checkbox = AceGUIDirectDeposit:Create("CheckBox")
             checkbox:SetLabel(name)
 
             -- if the items being requested and the state is true, set to true
@@ -312,7 +345,7 @@ function DirectDepositEventFrame:CreateWishList()
     end
 
     -- Create the frame container
-    local frame = AceGUI:Create("Frame", "LootSpecHelper Main Frame")
+    local frame = AceGUIDirectDeposit:Create("Frame", "LootSpecHelper Main Frame")
 
     -- Add the frame as a global variable under the name `MyGlobalFrameName`
     _G["LootSpecHelperGlobalFrameName"] = frame.frame
@@ -325,23 +358,23 @@ function DirectDepositEventFrame:CreateWishList()
     frame:SetTitle("Wish List")
     frame:SetStatusText("Created by Van on Garrosh for JFS.")
     frame:SetCallback("OnClose", function(widget)
-        AceGUI:Release(widget)
+        AceGUIDirectDeposit:Release(widget)
     end)
     frame:SetLayout("Flow")
 
-    local testContainer = AceGUI:Create("SimpleGroup")
+    local testContainer = AceGUIDirectDeposit:Create("SimpleGroup")
     testContainer:SetLayout("Flow")
     testContainer:SetFullHeight(true)
     testContainer:SetFullWidth(true)
     frame:AddChild(testContainer);
 
-    local scrollContainer = AceGUI:Create("ScrollFrame")
+    local scrollContainer = AceGUIDirectDeposit:Create("ScrollFrame")
     scrollContainer:SetLayout("List");
     scrollContainer:SetFullHeight(true)
     scrollContainer:SetFullWidth(true)
 
     -- Add a section header for the filters
-    local filterHeader = AceGUI:Create("Label")
+    local filterHeader = AceGUIDirectDeposit:Create("Label")
     filterHeader:SetFontObject(GameFontNormalLarge)
     filterHeader:SetColor(0.4, 0.6, 1) -- Change font color (light blue)
     filterHeader:SetText("Filters")
@@ -349,12 +382,12 @@ function DirectDepositEventFrame:CreateWishList()
     testContainer:AddChild(filterHeader)
 
     -- Create a search box
-    local searchBox = AceGUI:Create("EditBox")
+    local searchBox = AceGUIDirectDeposit:Create("EditBox")
     searchBox:SetLabel("Search")
     searchBox:SetWidth(200)
 
     -- add button to export here
-    local exportButton = AceGUI:Create("Button")
+    local exportButton = AceGUIDirectDeposit:Create("Button")
     exportButton:SetText("Export")
     exportButton:SetWidth(175)
     exportButton:SetCallback("OnClick", function()
@@ -363,7 +396,7 @@ function DirectDepositEventFrame:CreateWishList()
     testContainer:AddChild(exportButton)
     
     -- -- Create a save button
-    local saveButton = AceGUI:Create("Button")
+    local saveButton = AceGUIDirectDeposit:Create("Button")
     saveButton:SetText("Distribute")
     saveButton:SetWidth(175)
     saveButton:SetCallback("OnClick", function()
@@ -372,7 +405,7 @@ function DirectDepositEventFrame:CreateWishList()
     end)
     testContainer:AddChild(saveButton)
 
-    local selectedCheckbox = AceGUI:Create("CheckBox")
+    local selectedCheckbox = AceGUIDirectDeposit:Create("CheckBox")
     selectedCheckbox:SetLabel("Selected")
     selectedCheckbox:SetValue(wishSelected)
     selectedCheckbox:SetCallback("OnValueChanged", function(_, _, value)
@@ -385,7 +418,7 @@ function DirectDepositEventFrame:CreateWishList()
     end)
     testContainer:AddChild(selectedCheckbox)
 
-    local unselectedCheckbox = AceGUI:Create("CheckBox")
+    local unselectedCheckbox = AceGUIDirectDeposit:Create("CheckBox")
     unselectedCheckbox:SetLabel("Unselected")
     unselectedCheckbox:SetValue(wishUnselected)
     unselectedCheckbox:SetCallback("OnValueChanged", function(_, _, value)
@@ -401,7 +434,7 @@ function DirectDepositEventFrame:CreateWishList()
     testContainer:AddChild(searchBox)
 
     -- Add a section header for the items
-    local itemsHeader = AceGUI:Create("Label")
+    local itemsHeader = AceGUIDirectDeposit:Create("Label")
     itemsHeader:SetFontObject(GameFontNormalLarge)
     itemsHeader:SetColor(0.4, 0.6, 1) -- Change font color (light blue)
     itemsHeader:SetText("Items")
@@ -432,7 +465,7 @@ function DirectDepositEventFrame:CreateDonationList()
     end
 
     -- Create a separate container for the checkboxes
-    local checkboxContainer = AceGUI:Create("SimpleGroup")
+    local checkboxContainer = AceGUIDirectDeposit:Create("SimpleGroup")
     checkboxContainer:SetFullWidth(true)
     checkboxContainer:SetFullHeight(true)
     checkboxContainer:SetLayout("Flow")
@@ -440,7 +473,7 @@ function DirectDepositEventFrame:CreateDonationList()
     local function populateItems(items)
         for _, item in ipairs(items) do
             if item.state == true then
-                local checkbox = AceGUI:Create("CheckBox")
+                local checkbox = AceGUIDirectDeposit:Create("CheckBox")
                 checkbox:SetLabel(item.name)
 
                 -- Find the item in depositingItems and use its state as the initial value
@@ -487,7 +520,7 @@ function DirectDepositEventFrame:CreateDonationList()
     end
 
     -- Create the frame container
-    local frame = AceGUI:Create("Frame", "LootSpecHelper Main Frame")
+    local frame = AceGUIDirectDeposit:Create("Frame", "LootSpecHelper Main Frame")
 
     -- Add the frame as a global variable under the name `MyGlobalFrameName`
     _G["LootSpecHelperGlobalFrameName"] = frame.frame
@@ -500,23 +533,23 @@ function DirectDepositEventFrame:CreateDonationList()
     frame:SetTitle("Donation List")
     frame:SetStatusText("Created by Van on Garrosh for JFS.")
     frame:SetCallback("OnClose", function(widget)
-        AceGUI:Release(widget)
+        AceGUIDirectDeposit:Release(widget)
     end)
     frame:SetLayout("Flow")
 
-    local testContainer = AceGUI:Create("SimpleGroup")
+    local testContainer = AceGUIDirectDeposit:Create("SimpleGroup")
     testContainer:SetLayout("Flow")
     testContainer:SetFullHeight(true)
     testContainer:SetFullWidth(true)
     frame:AddChild(testContainer);
 
-    local scrollContainer = AceGUI:Create("ScrollFrame")
+    local scrollContainer = AceGUIDirectDeposit:Create("ScrollFrame")
     scrollContainer:SetLayout("List");
     scrollContainer:SetFullHeight(true)
     scrollContainer:SetFullWidth(true)
 
     -- Add a section header for the filters
-    local filterHeader = AceGUI:Create("Label")
+    local filterHeader = AceGUIDirectDeposit:Create("Label")
     filterHeader:SetFontObject(GameFontNormalLarge)
     filterHeader:SetColor(0.4, 0.6, 1) -- Change font color (light blue)
     filterHeader:SetText("Filters")
@@ -524,12 +557,12 @@ function DirectDepositEventFrame:CreateDonationList()
     testContainer:AddChild(filterHeader)
 
     -- Create a search box
-    local searchBox = AceGUI:Create("EditBox")
+    local searchBox = AceGUIDirectDeposit:Create("EditBox")
     searchBox:SetLabel("Search")
     searchBox:SetWidth(200)
 
     -- add button to import here
-    local importButton = AceGUI:Create("Button")
+    local importButton = AceGUIDirectDeposit:Create("Button")
     importButton:SetText("Import")
     importButton:SetCallback("OnClick", function()
         DirectDepositEventFrame:import(function()
@@ -540,7 +573,7 @@ function DirectDepositEventFrame:CreateDonationList()
     end)
     testContainer:AddChild(importButton)
 
-    local selectedCheckbox = AceGUI:Create("CheckBox")
+    local selectedCheckbox = AceGUIDirectDeposit:Create("CheckBox")
     selectedCheckbox:SetLabel("Selected")
     selectedCheckbox:SetValue(selected)
     selectedCheckbox:SetCallback("OnValueChanged", function(_, _, value)
@@ -553,7 +586,7 @@ function DirectDepositEventFrame:CreateDonationList()
     end)
     testContainer:AddChild(selectedCheckbox)
 
-    local unselectedCheckbox = AceGUI:Create("CheckBox")
+    local unselectedCheckbox = AceGUIDirectDeposit:Create("CheckBox")
     unselectedCheckbox:SetLabel("Unselected")
     unselectedCheckbox:SetValue(unselected)
     unselectedCheckbox:SetCallback("OnValueChanged", function(_, _, value)
@@ -569,7 +602,7 @@ function DirectDepositEventFrame:CreateDonationList()
     testContainer:AddChild(searchBox)
 
     -- Add a section header for the items
-    local itemsHeader = AceGUI:Create("Label")
+    local itemsHeader = AceGUIDirectDeposit:Create("Label")
     itemsHeader:SetFontObject(GameFontNormalLarge)
     itemsHeader:SetColor(0.4, 0.6, 1) -- Change font color (light blue)
     itemsHeader:SetText("Items - " .. timestamp)
