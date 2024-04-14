@@ -7,6 +7,8 @@ SLASH_DIRECTDEPOSIT2 = "/directdeposit"
 local selected, unselected = true, true
 local wishSelected, wishUnselected = true, true
 
+local DEBUG_MODE = false
+
 tinsert(UISpecialFrames, DirectDepositEventFrame:GetName())
 
 -- remove duplicates from each of the locale tables
@@ -20,6 +22,12 @@ for locale, items in pairs(LOCALE) do
         end
     end
     LOCALE[locale] = uniqueItems
+end
+
+local function debugPrint(msg)
+    if DEBUG_MODE then
+        print(msg)
+    end
 end
 
 local function tprint (tbl, indent)
@@ -48,12 +56,12 @@ local function tprint (tbl, indent)
 end
 
 function DirectDepositEventFrame:export()
-    -- Get the current timestamp
-    local timestamp = time()
+    -- Get the current dd_timestamp
+    local dd_timestamp = time()
 
     -- Prepare the data to be sent
     local dataToSend = {
-        timestamp = timestamp,
+        dd_timestamp = dd_timestamp,
         requestedItems = requestedItems
     }
 
@@ -98,10 +106,10 @@ function DirectDepositEventFrame:import(callback)
         local serializedString = DeflaterDirectDeposit:DecompressDeflate(compressedData)
         local success, dataPassed = SerializerDirectDeposit:Deserialize(serializedString)
         if success then
-            -- Only overwrite if the passed timestamp is higher than the current one
-            if dataPassed.timestamp > timestamp then
+            -- Only overwrite if the passed dd_timestamp is higher than the current one
+            if dataPassed.dd_timestamp > dd_timestamp then
                 requestedItems = dataPassed.requestedItems
-                timestamp = dataPassed.timestamp
+                dd_timestamp = dataPassed.dd_timestamp
                 for i, depositItem in ipairs(depositingItems) do
                     -- Assume the item is not in the new requestedItems
                     local found = false
@@ -138,24 +146,48 @@ function MyAddOn_CommsDirectDeposit:Init()
     self:RegisterComm(self.Prefix, "OnCommReceived")
 end
 
-function MyAddOn_CommsDirectDeposit:Distribute()
-    -- Get the current timestamp
-    timestamp = time()
-
-    -- Prepare the data to be sent
+function MyAddOn_CommsDirectDeposit:SendSyncResponse(receiver)
     local dataToSend = {
-        type = "Distribute",
+        type = "dd_sync_response_v1",
+        timestamp = timestamp
+    }
+
+    local serializedString = SerializerDirectDeposit:Serialize(dataToSend)
+    local compressedData = DeflaterDirectDeposit:CompressDeflate(serializedString)
+    local encodedString, err = DeflaterDirectDeposit:EncodeForWoWAddonChannel(compressedData)
+    debugPrint("did sync encoding and stuff")
+
+    self:SendCommMessage(myPrefixDirectDeposit, encodedString, "WHISPER", receiver)
+    debugPrint("sent sync response to " .. receiver)
+end
+
+function MyAddOn_CommsDirectDeposit:SendUpdate(receiver)
+    local dataToSend = {
+        type = "dd_update_v1",
         timestamp = timestamp,
         requestedItems = requestedItems
     }
 
-    -- Serialize the data
     local serializedString = SerializerDirectDeposit:Serialize(dataToSend)
-
-    -- Compress the serialized data
     local compressedData = DeflaterDirectDeposit:CompressDeflate(serializedString)
+    local encodedString, err = DeflaterDirectDeposit:EncodeForWoWAddonChannel(compressedData)
 
-    -- Encode the compressed data for transmission
+    self:SendCommMessage(myPrefixDirectDeposit, encodedString, "WHISPER", receiver)
+end
+
+function MyAddOn_CommsDirectDeposit:Distribute()
+    -- Get the current dd_timestamp
+    dd_timestamp = time()
+
+    -- Prepare the data to be sent
+    local dataToSend = {
+        type = "dd_distribute_v1",
+        dd_timestamp = dd_timestamp,
+        requestedItems = requestedItems
+    }
+    
+    local serializedString = SerializerDirectDeposit:Serialize(dataToSend)
+    local compressedData = DeflaterDirectDeposit:CompressDeflate(serializedString)
     local encodedString, err = DeflaterDirectDeposit:EncodeForWoWAddonChannel(compressedData)
 
     -- Send the encoded data to the guild channel
@@ -165,73 +197,83 @@ end
 
 function MyAddOn_CommsDirectDeposit:OnCommReceived(passedPrefix, msg, distribution, sender)
     if (passedPrefix == myPrefixDirectDeposit) then
-        -- Decode the received message
-        local decodedString, err = DeflaterDirectDeposit:DecodeForWoWAddonChannel(msg)
+        local playerName = UnitName("player")
+        if sender == playerName then
+            return -- Exit if the sender is the current user
+        end
 
-        -- Decompress the decoded string
-        local decompressedData, err = DeflaterDirectDeposit:DecompressDeflate(decodedString)
-
-        -- Deserialize the decompressed data
-        local success, dataReceived = SerializerDirectDeposit:Deserialize(decompressedData)
-        if not success then
-            print("Deserialization error: ", dataReceived) -- In case of an error, dataReceived is the error message
+        if msg == "dd_sync_v1" then
+            debugPrint("received sync")
+            self:SendSyncResponse(sender)
+            debugPrint("done sending sync response")
+        elseif msg == "dd_request_v1" then
+            debugPrint("received request")
+            self:SendUpdate(sender)
+            debugPrint("done sending update")
         else
-            if dataReceived.timestamp > timestamp then
-                if dataReceived.type == "Distribute" then
-                    print("received distribute")
-                elseif dataReceived.type == "Loaded" then
-                    print("received loaded")
-                else
-                    print("received something else: " .. dataReceived.type)
-                end
+            local decodedString = DeflaterDirectDeposit:DecodeForWoWAddonChannel(msg)
+            local decompressedData = DeflaterDirectDeposit:DecompressDeflate(decodedString)
+            local success, dataReceived = SerializerDirectDeposit:Deserialize(decompressedData)
+            if not success then
+                print("Deserialization error: ", dataReceived) -- In case of an error, dataReceived is the error message
             else
-                print("Failed to update data. Your version is newer.")
+                if dataReceived.type == "dd_sync_response_v1" then
+                    debugPrint("received sync response")
+                    if dd_timestamp > dataReceived.dd_timestamp then
+                        debugPrint("sending update since my timestamp is newer")
+                        self:SendUpdate(sender)
+                        debugPrint("done sending update since my timestamp is newer")
+                    else
+                        debugPrint("sending request since my timestamp is older")
+                        self:SendCommMessage(myPrefixDirectDeposit, "dd_request_v1", "WHISPER", sender)
+                        debugPrint("done sending request since my timestamp is older")
+                    end
+                elseif dataReceived.type == "dd_distribute_v1" then
+                    debugPrint("received distribute")
+                    dd_timestamp = dataReceived.dd_timestamp
+                    requestedItems = dataReceived.requestedItems
+                    debugPrint("done updating from distribute")
+                elseif dataReceived.type == "dd_update_v1" then
+                    debugPrint("received update")
+                    if dd_timestamp < dataReceived.dd_timestamp then
+                        debugPrint("updating from update")
+                        dd_timestamp = dataReceived.dd_timestamp
+                        requestedItems = dataReceived.requestedItems
+                        debugPrint("done updating from update")
+                    end
+                end
             end
         end
     end
 end
 
 function DirectDepositEventFrame:onLoad()
+    debugPrint("in onLoad")
     SerializerDirectDeposit = LibStub("LibSerialize");
 	DeflaterDirectDeposit = LibStub("LibDeflate");
 	AceGUIDirectDeposit = LibStub("AceGUI-3.0");
 	AceCommDirectDeposit = LibStub:GetLibrary("AceComm-3.0");
 	MyAddOn_CommsDirectDeposit.Prefix = myPrefixDirectDeposit;
 	MyAddOn_CommsDirectDeposit:Init();
+    debugPrint("done onLoad")
 end
 
 function DirectDepositEventFrame:OnEvent(event, text)
     if(event == "PLAYER_ENTERING_WORLD") then
+        debugPrint("PEW.")
         if not SerializerDirectDeposit then
             DirectDepositEventFrame:onLoad();
         end
     elseif(event == "ADDON_LOADED") then
         if(text == "DirectDeposit") then
+            debugPrint("direct deposit loaded")
             DirectDepositEventFrame:LoadSavedVariables();
 
             if not SerializerDirectDeposit then
                 DirectDepositEventFrame:onLoad();
             end
-
-            -- Prepare the data to be sent
-            local dataToSend = {
-                type = "Loaded",
-                timestamp = timestamp,
-                requestedItems = requestedItems
-            }
-        
-            -- Serialize the data
-            local serializedString = SerializerDirectDeposit:Serialize(dataToSend)
-        
-            -- Compress the serialized data
-            local compressedData = DeflaterDirectDeposit:CompressDeflate(serializedString)
-        
-            -- Encode the compressed data for transmission
-            local encodedString, err = DeflaterDirectDeposit:EncodeForWoWAddonChannel(compressedData)
-        
-            -- Send the encoded data to the guild channel
-            MyAddOn_CommsDirectDeposit:SendCommMessage(myPrefixDirectDeposit, encodedString, "GUILD")
-            print("sent the data on addon loaded for direct deposit")
+            MyAddOn_CommsDirectDeposit:SendCommMessage(myPrefixDirectDeposit, "dd_sync_v1", "GUILD")
+            debugPrint("sent addon loaded sync message")
         end
 	end
 end
@@ -247,8 +289,8 @@ function DirectDepositEventFrame:LoadSavedVariables()
     if requestedItems == nil then
         requestedItems = {}
     end
-    if timestamp == nil then
-        timestamp = 0
+    if dd_timestamp == nil then
+        dd_timestamp = 0
     end
 end
 
@@ -605,7 +647,7 @@ function DirectDepositEventFrame:CreateDonationList()
     local itemsHeader = AceGUIDirectDeposit:Create("Label")
     itemsHeader:SetFontObject(GameFontNormalLarge)
     itemsHeader:SetColor(0.4, 0.6, 1) -- Change font color (light blue)
-    itemsHeader:SetText("Items - " .. timestamp)
+    itemsHeader:SetText("Items - " .. dd_timestamp)
     itemsHeader:SetFullWidth(true)
     testContainer:AddChild(itemsHeader)
 
