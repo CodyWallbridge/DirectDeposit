@@ -720,7 +720,7 @@ end
 function SlashCmdList.DIRECTDEPOSIT(msg, editbox)
     -- if they enter edit, then check if they are an officer and open the edit window
     if strtrim(msg) == "edit" then
-        if(C_GuildInfo.IsGuildOfficer()) then 
+        if(C_GuildInfo.IsGuildOfficer()) then -- RELEASE needs to include this and not the above
             DirectDepositEventFrame:CreateWishList();
         end
     elseif strtrim(msg) == "export" then
