@@ -149,7 +149,7 @@ end
 function MyAddOn_CommsDirectDeposit:SendSyncResponse(receiver)
     local dataToSend = {
         type = "dd_sync_response_v1",
-        timestamp = timestamp
+        dd_timestamp = dd_timestamp
     }
 
     local serializedString = SerializerDirectDeposit:Serialize(dataToSend)
@@ -219,6 +219,8 @@ function MyAddOn_CommsDirectDeposit:OnCommReceived(passedPrefix, msg, distributi
             else
                 if dataReceived.type == "dd_sync_response_v1" then
                     debugPrint("received sync response")
+                    print("Sync response received from " .. sender .. " with timestamp " .. dataReceived.dd_timestamp .. " and mine is " .. dd_timestamp)
+-- ****************** last print
                     if dd_timestamp > dataReceived.dd_timestamp then
                         debugPrint("sending update since my timestamp is newer")
                         self:SendUpdate(sender)
