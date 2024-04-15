@@ -257,14 +257,40 @@ function DirectDepositEventFrame:onLoad()
 	MyAddOn_CommsDirectDeposit:Init();
     debugPrint("done onLoad")
 end
+local DirectDeposit_DepositButton = nil;
 
-function DirectDepositEventFrame:OnEvent(event, text)
+function DirectDepositEventFrame:CreateDepositButton()
+    -- Create a frame for the button parented to the GuildBankFrame
+    local myButton = CreateFrame("Button", "MyButton", nil, "UIPanelButtonTemplate")
+    
+    -- Set the position of the button relative to the GuildBankFrame
+    myButton:SetPoint("CENTER", UIParent, "CENTER", 0, -100)
+    myButton:SetNormalTexture("Interface\\AddOns\\DirectDeposit\\Media\\Icons\\DirectDeposit.jpeg")
+    
+    -- Set the size of the button
+    myButton:SetSize(50 ,50)
+    
+    -- Set the text of the button
+    myButton:SetText("Deposit")
+    local buttonText = myButton:GetFontString()
+    buttonText:SetPoint("BOTTOM", myButton, "TOP", 0, 0)
+    
+    -- Set the function that will be called when the button is clicked
+    myButton:SetScript("OnClick", function()
+        print("Button clicked!")
+    end)
+
+    DirectDeposit_DepositButton = myButton;
+end
+
+function DirectDepositEventFrame:OnEvent(event, ...)
     if(event == "PLAYER_ENTERING_WORLD") then
         debugPrint("PEW.")
         if not SerializerDirectDeposit then
             DirectDepositEventFrame:onLoad();
         end
     elseif(event == "ADDON_LOADED") then
+        local text = ...
         if(text == "DirectDeposit") then
             debugPrint("direct deposit loaded")
             DirectDepositEventFrame:LoadSavedVariables();
@@ -275,11 +301,25 @@ function DirectDepositEventFrame:OnEvent(event, text)
             MyAddOn_CommsDirectDeposit:SendCommMessage(myPrefixDirectDeposit, "dd_sync_v1", "GUILD")
             debugPrint("sent addon loaded sync message")
         end
+    elseif event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" then
+        local type = ...
+        if type == 10 then
+            DirectDepositEventFrame:CreateDepositButton();
+        end
+    elseif event == "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" then
+        local type = ...
+        if type == 10 then
+            if DirectDeposit_DepositButton then
+                DirectDeposit_DepositButton:Hide()
+            end
+        end
 	end
 end
 
 DirectDepositEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
 DirectDepositEventFrame:RegisterEvent("ADDON_LOADED")
+DirectDepositEventFrame:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW")
+DirectDepositEventFrame:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_HIDE")
 DirectDepositEventFrame:SetScript("OnEvent", DirectDepositEventFrame.OnEvent);
 
 function DirectDepositEventFrame:LoadSavedVariables()
