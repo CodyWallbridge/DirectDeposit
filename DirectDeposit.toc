@@ -2,8 +2,8 @@
 ## Title: DirectDeposit
 ## Author: Van
 ## Version: 0.5
-## SavedVariablesPerCharacter: depositingItems, requestedItems, timestamp
-## IconTexture: Interface\AddOns\PetCompare\Media\Icons\DirectDeposit.jpeg
+## SavedVariablesPerCharacter: depositingItems, requestedItems, dd_timestamp
+## IconTexture: Interface\AddOns\DirectDeposit\Media\Icons\DirectDeposit.jpeg
 
 libs\LibStub\LibStub.lua
 libs\LibSerialize\lib.xml
