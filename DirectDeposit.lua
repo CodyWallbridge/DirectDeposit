@@ -7,7 +7,9 @@ SLASH_DIRECTDEPOSIT2 = "/directdeposit"
 local selected, unselected = true, true
 local wishSelected, wishUnselected = true, true
 
-local DEBUG_MODE = true
+local DEBUG_MODE = false
+
+local DirectDeposit_DepositButton = nil;
 
 tinsert(UISpecialFrames, DirectDepositEventFrame:GetName())
 
@@ -161,20 +163,6 @@ function MyAddOn_CommsDirectDeposit:SendSyncResponse(receiver)
     debugPrint("sent sync response to " .. receiver)
 end
 
-function MyAddOn_CommsDirectDeposit:SendUpdate(receiver)
-    local dataToSend = {
-        type = "dd_update_v1",
-        dd_timestamp = dd_timestamp,
-        requestedItems = requestedItems
-    }
-
-    local serializedString = SerializerDirectDeposit:Serialize(dataToSend)
-    local compressedData = DeflaterDirectDeposit:CompressDeflate(serializedString)
-    local encodedString, err = DeflaterDirectDeposit:EncodeForWoWAddonChannel(compressedData)
-
-    self:SendCommMessage(myPrefixDirectDeposit, encodedString, "WHISPER", receiver)
-end
-
 function MyAddOn_CommsDirectDeposit:Distribute()
     -- Get the current dd_timestamp
     dd_timestamp = time()
@@ -193,6 +181,20 @@ function MyAddOn_CommsDirectDeposit:Distribute()
     -- Send the encoded data to the guild channel
     self:SendCommMessage(myPrefixDirectDeposit, encodedString, "GUILD")
 
+end
+
+function MyAddOn_CommsDirectDeposit:SendUpdate(receiver)
+    local dataToSend = {
+        type = "dd_update_v1",
+        dd_timestamp = dd_timestamp,
+        requestedItems = requestedItems
+    }
+
+    local serializedString = SerializerDirectDeposit:Serialize(dataToSend)
+    local compressedData = DeflaterDirectDeposit:CompressDeflate(serializedString)
+    local encodedString, err = DeflaterDirectDeposit:EncodeForWoWAddonChannel(compressedData)
+
+    self:SendCommMessage(myPrefixDirectDeposit, encodedString, "WHISPER", receiver)
 end
 
 function MyAddOn_CommsDirectDeposit:OnCommReceived(passedPrefix, msg, distribution, sender)
@@ -219,8 +221,6 @@ function MyAddOn_CommsDirectDeposit:OnCommReceived(passedPrefix, msg, distributi
             else
                 if dataReceived.type == "dd_sync_response_v1" then
                     debugPrint("received sync response")
-                    print("Sync response received from " .. sender .. " with timestamp " .. dataReceived.dd_timestamp .. " and mine is " .. dd_timestamp)
--- ****************** last print
                     if dd_timestamp > dataReceived.dd_timestamp then
                         debugPrint("sending update since my timestamp is newer")
                         self:SendUpdate(sender)
@@ -259,7 +259,6 @@ function DirectDepositEventFrame:onLoad()
 	MyAddOn_CommsDirectDeposit:Init();
     debugPrint("done onLoad")
 end
-local DirectDeposit_DepositButton = nil;
 
 function DirectDepositEventFrame:CreateDepositButton()
     -- Create a frame for the button parented to the GuildBankFrame
@@ -269,7 +268,6 @@ function DirectDepositEventFrame:CreateDepositButton()
     myButton:SetPoint("CENTER", UIParent, "CENTER", 0, -100)
     myButton:SetNormalTexture("Interface\\AddOns\\DirectDeposit\\Media\\Icons\\DirectDeposit.jpeg")
     
-    -- Set the size of the button
     myButton:SetSize(50 ,50)
     
     -- Set the text of the button
@@ -279,7 +277,20 @@ function DirectDepositEventFrame:CreateDepositButton()
     
     -- Set the function that will be called when the button is clicked
     myButton:SetScript("OnClick", function()
-        print("Button clicked!")
+        for bag = BACKPACK_CONTAINER, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
+            for slot = 1, C_Container.GetContainerNumSlots(bag) do
+                local itemLink = C_Container.GetContainerItemLink(bag, slot)
+                if itemLink then
+                    local itemName = GetItemInfo(itemLink)
+                    for _, item in ipairs(depositingItems) do
+                        if item.name == itemName and item.state == true then
+                            C_Container.UseContainerItem(bag, slot)
+                            break
+                        end
+                    end
+                end
+            end
+        end
     end)
 
     DirectDeposit_DepositButton = myButton;
@@ -339,6 +350,7 @@ end
 function DirectDepositEventFrame:CreateWishList()
     local tradeGoods
     local locale = GetLocale()
+    -- the following share languages mostly, so can be grouped together based on wowhead language support
     -- en_US, en_GB
     -- es_MX, es_ES
     -- zh_CN, zh_TW
@@ -706,10 +718,9 @@ function DirectDepositEventFrame:CreateDonationList()
 end
 
 function SlashCmdList.DIRECTDEPOSIT(msg, editbox)
-    -- if they enter edit, then check if they are the gm and open the edit window
+    -- if they enter edit, then check if they are an officer and open the edit window
     if strtrim(msg) == "edit" then
-        if(C_GuildInfo.IsGuildOfficer() or UnitName("player") == "Vandredor") then
-        --if(C_GuildInfo.IsGuildOfficer()) then -- RELEASE needs to include this and not the above
+        if(C_GuildInfo.IsGuildOfficer()) then 
             DirectDepositEventFrame:CreateWishList();
         end
     elseif strtrim(msg) == "export" then
