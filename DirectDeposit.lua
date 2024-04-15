@@ -164,7 +164,7 @@ end
 function MyAddOn_CommsDirectDeposit:SendUpdate(receiver)
     local dataToSend = {
         type = "dd_update_v1",
-        timestamp = timestamp,
+        dd_timestamp = dd_timestamp,
         requestedItems = requestedItems
     }
 
