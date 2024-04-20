@@ -17,13 +17,15 @@ local depositedItemCount = 0
 
 local gbankOpen = false
 
+local availableItems = {}
+
 tinsert(UISpecialFrames, DirectDepositEventFrame:GetName())
 
 function SlashCmdList.DIRECTDEPOSIT(msg, editbox)
     local lowerMsg = strlower(strtrim(msg))
     -- if they enter edit, then check if they are an officer and open the edit window
     if lowerMsg == "edit" then
-        if(C_GuildInfo.IsGuildOfficer() or UnitName("player") == "Vanethos") then
+        if(C_GuildInfo.IsGuildOfficer()) then
             DirectDepositEventFrame:CreateWishList();
         else 
             print("You must be an officer to edit the wish list.")
@@ -36,6 +38,21 @@ function SlashCmdList.DIRECTDEPOSIT(msg, editbox)
             DirectDepositEventFrame:CreateDonationList();
     else
         print(msg .. " is not a valid command")
+    end
+end
+
+function DirectDepositEventFrame:LoadSavedVariables()
+    if depositingItems == nil then
+        depositingItems = {}
+    end
+    if requestedItems == nil then
+        requestedItems = {}
+    end
+    if dd_timestamp == nil then
+        dd_timestamp = 0
+    end
+    if not dd_deposit_frame_loc then
+        dd_deposit_frame_loc = {"CENTER", UIParent, "CENTER", 0, -100}
     end
 end
 
@@ -272,23 +289,6 @@ function DirectDepositEventFrame:onLoad()
 	MyAddOn_CommsDirectDeposit:Init();
     debugPrint("done onLoad")
 end
-
-function DirectDepositEventFrame:LoadSavedVariables()
-    if depositingItems == nil then
-        depositingItems = {}
-    end
-    if requestedItems == nil then
-        requestedItems = {}
-    end
-    if dd_timestamp == nil then
-        dd_timestamp = 0
-    end
-    if not dd_deposit_frame_loc then
-        dd_deposit_frame_loc = {"CENTER", UIParent, "CENTER", 0, -100}
-    end
-end
-
-local availableItems = {}
 
 -- button deposits everything from list, no handling of ranks whatsoever.
 function DirectDepositEventFrame:CreateDepositButton()
