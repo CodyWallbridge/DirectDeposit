@@ -788,6 +788,8 @@ function DirectDepositEventFrame:CreateWishList()
         
         local filteredItems = filterItems(value)
         populateItems(filteredItems)
+        scrollContainer:SetScroll(0)
+        scrollContainer:DoLayout()
     end)
 
     populateItems(tradeGoods) -- this is the bottle neck.
@@ -960,6 +962,8 @@ function DirectDepositEventFrame:CreateDonationList()
 
         local filteredItems = filterItems(value)
         populateItems(filteredItems)
+        scrollContainer:SetScroll(0)
+        scrollContainer:DoLayout()
     end)
 
     populateItems(requestedItems)
