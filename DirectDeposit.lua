@@ -302,7 +302,6 @@ function DirectDepositEventFrame:CreateDepositButton()
     local point, relativeToName, relativePoint, xOfs, yOfs = unpack(dd_deposit_frame_loc)
     local relativeTo = _G[relativeToName]
     itemFrame:SetPoint(point, relativeTo, relativePoint, xOfs, yOfs)
-    --itemFrame:SetPoint(unpack(dd_deposit_frame_loc))    
 
     itemFrame:SetCallback("OnClose", function(widget)
         local point, relativeTo, relativePoint, xOfs, yOfs = itemFrame:GetPoint()
@@ -504,7 +503,7 @@ function DirectDepositEventFrame:CreateDepositButton()
                         end
                     end
                 end)
-                delay = delay + 1 -- Increase delay by 0.5 seconds for each item
+                delay = delay + 1 -- Increase delay by 1 second for each item
             end
         end
 
@@ -753,6 +752,8 @@ function DirectDepositEventFrame:CreateWishList()
         C_Timer.After(0.1, function()
             local filteredItems = filterItems(searchBox:GetText())
             populateItems(filteredItems)
+            scrollContainer:SetScroll(0)
+            scrollContainer:DoLayout()
         end)
     end)
     testContainer:AddChild(selectedCheckbox)
@@ -766,6 +767,8 @@ function DirectDepositEventFrame:CreateWishList()
         C_Timer.After(0.1, function()
             local filteredItems = filterItems(searchBox:GetText())
             populateItems(filteredItems)
+            scrollContainer:SetScroll(0)
+            scrollContainer:DoLayout()
         end)
     end)
     testContainer:AddChild(unselectedCheckbox)
@@ -803,7 +806,7 @@ function DirectDepositEventFrame:CreateDonationList()
         return nil
     end
 
-    -- Create a separate container for the checkboxes
+    -- Create a separate container to hold the checkboxes for each item
     local checkboxContainer = AceGUIDirectDeposit:Create("SimpleGroup")
     checkboxContainer:SetFullWidth(true)
     checkboxContainer:SetFullHeight(true)
@@ -921,6 +924,8 @@ function DirectDepositEventFrame:CreateDonationList()
         C_Timer.After(0.1, function()
             local filteredItems = filterItems(searchBox:GetText())
             populateItems(filteredItems)
+            scrollContainer:SetScroll(0)
+            scrollContainer:DoLayout()
         end)
     end)
     testContainer:AddChild(selectedCheckbox)
@@ -934,6 +939,8 @@ function DirectDepositEventFrame:CreateDonationList()
         C_Timer.After(0.1, function()
             local filteredItems = filterItems(searchBox:GetText())
             populateItems(filteredItems)
+            scrollContainer:SetScroll(0)
+            scrollContainer:DoLayout()
         end)
     end)
     testContainer:AddChild(unselectedCheckbox)
