@@ -25,7 +25,7 @@ function SlashCmdList.DIRECTDEPOSIT(msg, editbox)
     local lowerMsg = strlower(strtrim(msg))
     -- if they enter edit, then check if they are an officer and open the edit window
     if lowerMsg == "edit" then
-        if(C_GuildInfo.IsGuildOfficer() or UnitName("player") == "Vanethos") then
+        if(C_GuildInfo.IsGuildOfficer()) then
             DirectDepositEventFrame:CreateWishList();
         else 
             print("You must be an officer to edit the wish list.")
