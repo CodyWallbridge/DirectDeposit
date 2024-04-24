@@ -22,268 +22,6 @@ local directDepositGlobalButton = nil
 
 tinsert(UISpecialFrames, DirectDepositEventFrame:GetName())
 
--- button deposits everything from list, no handling of ranks whatsoever.
-function DirectDepositEventFrame:CreateDepositButton()
-    print("in create")
-
-    -- create the frame to hold the items
-    local itemFrame = AceGUIDirectDeposit:Create("Frame", "MyItemFrame")
-    itemFrame:SetTitle("DirectDeposit")
-    itemFrame:SetWidth(425)
-    itemFrame:SetHeight(400)
-
-    local point, relativeToName, relativePoint, xOfs, yOfs = unpack(dd_deposit_frame_loc)
-    local relativeTo = _G[relativeToName]
-    itemFrame:SetPoint(point, relativeTo, relativePoint, xOfs, yOfs)
-
-    itemFrame:SetCallback("OnClose", function(widget)
-        local point, relativeTo, relativePoint, xOfs, yOfs = itemFrame:GetPoint()
-        -- Set relativeToName to "UIParent" by default
-        local relativeToName = "UIParent"
-        if relativeTo then
-            relativeToName = relativeTo:GetName()
-        end
-        dd_deposit_frame_loc = {point, relativeToName, relativePoint, xOfs, yOfs}
-        AceGUIDirectDeposit:Release(widget)
-        -- remove directDepositGlobalButton
-        directDepositGlobalButton:Hide()
-        directDepositGlobalButton = nil
-    end)
-    itemFrame:SetLayout("Fill")
-
-    -- Create a ScrollFrame
-    local scrollFrame = AceGUIDirectDeposit:Create("ScrollFrame")
-    scrollFrame:SetLayout("Flow") 
-    itemFrame:AddChild(scrollFrame)
-
-    -- Add the frame as a global variable under the name `MyGlobalFrameName`
-    _G["itemFrame"] = itemFrame.frame
-    -- Register the global variable `MyGlobalFrameName` as a "special frame"
-    -- so that it is closed when the escape key is pressed.
-    tinsert(UISpecialFrames, "itemFrame")
-
-    availableItems = {}
-    -- determine items available to deposit
-    for bag = BACKPACK_CONTAINER, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) do
-            local itemLink = C_Container.GetContainerItemLink(bag, slot)
-            if itemLink then
-                local itemName = GetItemInfo(itemLink)
-                for _, item in ipairs(depositingItems) do
-                    if item.name == itemName and item.state == true then
-                        local linkChanged = (itemLink:gsub("|", "||") )
-                        local rank = ""
-                        if linkChanged:match("Tier1") then
-                            rank = " Rank 1"
-                        elseif linkChanged:match("Tier2") then
-                            rank = " Rank 2"
-                        elseif linkChanged:match("Tier3") then
-                            rank = " Rank 3"
-                        end
-                        local newItem = {
-                            name = item.name .. rank,
-                            state = item.state
-                        }
-                        local itemInfo = {
-                            bagId = bag,
-                            slotId = slot,
-                            item = newItem,
-                            selected = true
-                        }
-                        table.insert(availableItems, itemInfo)
-                        break
-                    end
-                end
-            end
-        end
-    end
-
-
-    -- add each item to the frame
-    for i, itemInfo in ipairs(availableItems) do
-        local itemLocation = ItemLocation:CreateFromBagAndSlot(itemInfo.bagId, itemInfo.slotId) -- get item location
-        local itemCount = C_Item.GetStackCount(itemLocation) -- get item count from item location
-        local isSplittable = itemCount and itemCount > 1 -- check if item is splittable
-
-        -- Create a simple group to hold the item
-        local itemGroup = AceGUIDirectDeposit:Create("SimpleGroup")
-        itemGroup:SetFullWidth(true)
-        itemGroup:SetLayout("Flow")
-        
-        -- Create a CheckBox for selection/deselection, use itemInfo.selected as the initial value and update it when the CheckBox is clicked
-        local checkBox = AceGUIDirectDeposit:Create("CheckBox")
-        checkBox:SetValue(itemInfo.selected)
-        checkBox:SetWidth(30)
-        checkBox:SetCallback("OnValueChanged", function(widget, event, value)
-            itemInfo.selected = value
-        end)
-        itemGroup:AddChild(checkBox)
-        
-        -- Create a label for the name
-        local label = AceGUIDirectDeposit:Create("Label")
-        local itemName = itemInfo.item.name
-        if isSplittable then
-            itemName = tostring(itemCount) .. " x " .. itemName
-        end
-        label:SetText(itemName)
-        label:SetWidth(220)
-        itemGroup:AddChild(label)
-        scrollFrame:AddChild(itemGroup)
-        
-        -- Create a Button for splitting if the item is splittable
-        if isSplittable then
-            local splitButton = AceGUIDirectDeposit:Create("Button")
-            splitButton:SetText("Split")
-            splitButton:SetWidth(100)
-            splitButton:SetHeight(25)
-            splitButton:SetCallback("OnClick", function(widget)
-                -- Create a new frame for the popup
-                local frame = AceGUIDirectDeposit:Create("Frame")
-                frame:SetTitle("Split Stack")
-                frame:SetLayout("Flow")
-                frame:SetWidth(200)
-                frame:SetHeight(200)
-                
-                -- Create a Slider for the number with AceGUI
-                local slider = AceGUIDirectDeposit:Create("Slider")
-                slider:SetLabel("Enter number to split:")
-                slider:SetSliderValues(1, itemCount, 1)
-                slider:SetValue(1)
-                slider:SetCallback("OnValueChanged", function(widget, event, value)
-                    local num = tonumber(value)
-                    if num then
-                        if num < 1 then
-                            num = 1
-                        elseif num > itemCount then
-                            num = itemCount
-                        end
-                        widget:SetValue(num)
-                    end
-                end)
-                slider:SetCallback("OnEnterPressed", function(widget, event, value)
-                    local num = tonumber(value)
-                    if num then
-                        if num < 1 then
-                            num = 1
-                        elseif num > itemCount then
-                            num = itemCount
-                        end
-                        widget:SetValue(num)
-                    end
-                end)
-                frame:AddChild(slider)
-            
-                -- Create a Button for the OK action
-                local okButton = AceGUIDirectDeposit:Create("Button")
-                okButton:SetText("OK")
-                okButton:SetWidth(100)
-                okButton:SetCallback("OnClick", function(widget)
-                    local value = slider.editbox:GetText()
-                    local num = tonumber(value)
-                    if num then
-                        if num < 1 then
-                            num = 1
-                        elseif num > itemCount then
-                            num = itemCount
-                        end
-                        slider:SetValue(num)
-                    end
-                    local num = slider:GetValue()
-                    if num and num >= 1 and num <= itemCount then
-                        C_Container.SplitContainerItem(itemInfo.bagId, itemInfo.slotId, num)
-                        frame:Release()
-                        DirectDepositEventFrame:CreateDepositButton()
-                    end
-                    depositedItemCount = #availableItems
-                end)
-                frame:AddChild(okButton)
-            end)
-            itemGroup:AddChild(splitButton)
-        end
-    end
-
-    local directDepositMyButton = CreateFrame("Button", "directDepositMyButton", itemFrame.frame, "UIPanelButtonTemplate")
-    directDepositGlobalButton = directDepositMyButton
-    directDepositMyButton:SetSize(100 ,100)
-    directDepositMyButton:SetPoint("BOTTOM", 0, -110)
-    directDepositMyButton:SetNormalTexture("Interface\\AddOns\\DirectDeposit\\Media\\Icons\\DirectDeposit.jpeg")
-    directDepositMyButton:SetText("Deposit")
-    directDepositMyButton:SetNormalFontObject(GameFontNormalLarge)
-    directDepositMyButton:SetHighlightFontObject(GameFontNormalLarge)
-
-    local buttonText = directDepositMyButton:GetFontString()
-    directDepositMyButton:SetNormalFontObject(GameFontNormalLarge)
-    buttonText:SetPoint("BOTTOM", directDepositMyButton, "TOP", 0, 0)
-    buttonText:SetTextColor(0, 1, 0)
-
-    directDepositMyButton:SetScript("OnClick", function()
-        PlaySoundFile("Interface\\AddOns\\DirectDeposit\\Media\\sounds\\ka-ching.mp3")
-        local depositedItem = false
-        depositedItemCount = 0
-        local delay = 0
-        depositing = true
-
-        -- deposit all available items selected for deposit
-        for _, itemInfo in ipairs(availableItems) do
-            if itemInfo.selected then
-                C_Timer.After(delay, function()
-                    local status, itemLocation = pcall(ItemLocation.CreateFromBagAndSlot, ItemLocation, itemInfo.bagId, itemInfo.slotId) -- get item location
-                    if not status then
-                        print("Error creating item location: " .. itemLocation) -- itemLocation contains the error message if status is false                    
-                    else
-                        local itemCount = C_Item.GetStackCount(itemLocation) -- get item count from item location
-                        if gbankOpen then
-                            print("Depositing " .. itemCount .. " x " .. itemInfo.item.name)
-                            C_Container.UseContainerItem(itemInfo.bagId, itemInfo.slotId)
-                            depositedItem = true
-                            depositedItemCount = depositedItemCount + 1
-                        end
-                    end
-                end)
-                delay = delay + 1 -- Increase delay by 1 second for each item
-            end
-        end
-
-        C_Timer.After(delay, function()
-            if not depositedItem then
-                print("No items to deposit.")
-            else
-                print("Thank you for your donations!")
-            end
-            for _, frame in ipairs(DirectDeposit_DepositFrame) do
-                frame:Release()
-            end
-            DirectDeposit_DepositFrame = {}
-            DirectDepositEventFrame:CreateDepositButton() -- Refresh the frame
-            depositing = false
-        end)
-    end)
-
-    table.insert(DirectDeposit_DepositFrame, itemFrame);
-    -- Register the BAG_UPDATE event
-    local eventFrame = CreateFrame("Frame")
-    eventFrame:RegisterEvent("BAG_UPDATE")
-    local timer = nil
-    eventFrame:SetScript("OnEvent", function(self, event, ...)
-        if event == "BAG_UPDATE" then
-            if itemFrame:IsShown() and not isUpdating and not depositing then
-                isUpdating = true
-                if timer then
-                    timer:Cancel()
-                end
-                timer = C_Timer.NewTimer(0.1, function()
-                    for _,frame in ipairs(DirectDeposit_DepositFrame) do
-                        frame:Release()
-                    end
-                    DirectDeposit_DepositFrame = {}
-                    DirectDepositEventFrame:CreateDepositButton() -- Refresh the frame
-                    isUpdating = false
-                end)
-            end
-        end
-    end)
-end
-
 function SlashCmdList.DIRECTDEPOSIT(msg, editbox)
     local lowerMsg = strlower(strtrim(msg))
     -- if they enter edit, then check if they are an officer and open the edit window
@@ -551,6 +289,268 @@ function DirectDepositEventFrame:onLoad()
 	MyAddOn_CommsDirectDeposit.Prefix = myPrefixDirectDeposit;
 	MyAddOn_CommsDirectDeposit:Init();
     debugPrint("done onLoad")
+end
+
+-- button deposits everything from list, no handling of ranks whatsoever.
+function DirectDepositEventFrame:CreateDepositButton()
+    print("in create")
+
+    -- create the frame to hold the items
+    local itemFrame = AceGUIDirectDeposit:Create("Frame", "MyItemFrame")
+    itemFrame:SetTitle("DirectDeposit")
+    itemFrame:SetWidth(425)
+    itemFrame:SetHeight(400)
+
+    local point, relativeToName, relativePoint, xOfs, yOfs = unpack(dd_deposit_frame_loc)
+    local relativeTo = _G[relativeToName]
+    itemFrame:SetPoint(point, relativeTo, relativePoint, xOfs, yOfs)
+
+    itemFrame:SetCallback("OnClose", function(widget)
+        local point, relativeTo, relativePoint, xOfs, yOfs = itemFrame:GetPoint()
+        -- Set relativeToName to "UIParent" by default
+        local relativeToName = "UIParent"
+        if relativeTo then
+            relativeToName = relativeTo:GetName()
+        end
+        dd_deposit_frame_loc = {point, relativeToName, relativePoint, xOfs, yOfs}
+        AceGUIDirectDeposit:Release(widget)
+        -- remove directDepositGlobalButton
+        directDepositGlobalButton:Hide()
+        directDepositGlobalButton = nil
+    end)
+    itemFrame:SetLayout("Fill")
+
+    -- Create a ScrollFrame
+    local scrollFrame = AceGUIDirectDeposit:Create("ScrollFrame")
+    scrollFrame:SetLayout("Flow") 
+    itemFrame:AddChild(scrollFrame)
+
+    -- Add the frame as a global variable under the name `MyGlobalFrameName`
+    _G["itemFrame"] = itemFrame.frame
+    -- Register the global variable `MyGlobalFrameName` as a "special frame"
+    -- so that it is closed when the escape key is pressed.
+    tinsert(UISpecialFrames, "itemFrame")
+
+    availableItems = {}
+    -- determine items available to deposit
+    for bag = BACKPACK_CONTAINER, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local itemLink = C_Container.GetContainerItemLink(bag, slot)
+            if itemLink then
+                local itemName = GetItemInfo(itemLink)
+                for _, item in ipairs(depositingItems) do
+                    if item.name == itemName and item.state == true then
+                        local linkChanged = (itemLink:gsub("|", "||") )
+                        local rank = ""
+                        if linkChanged:match("Tier1") then
+                            rank = " Rank 1"
+                        elseif linkChanged:match("Tier2") then
+                            rank = " Rank 2"
+                        elseif linkChanged:match("Tier3") then
+                            rank = " Rank 3"
+                        end
+                        local newItem = {
+                            name = item.name .. rank,
+                            state = item.state
+                        }
+                        local itemInfo = {
+                            bagId = bag,
+                            slotId = slot,
+                            item = newItem,
+                            selected = true
+                        }
+                        table.insert(availableItems, itemInfo)
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+
+    -- add each item to the frame
+    for i, itemInfo in ipairs(availableItems) do
+        local itemLocation = ItemLocation:CreateFromBagAndSlot(itemInfo.bagId, itemInfo.slotId) -- get item location
+        local itemCount = C_Item.GetStackCount(itemLocation) -- get item count from item location
+        local isSplittable = itemCount and itemCount > 1 -- check if item is splittable
+
+        -- Create a simple group to hold the item
+        local itemGroup = AceGUIDirectDeposit:Create("SimpleGroup")
+        itemGroup:SetFullWidth(true)
+        itemGroup:SetLayout("Flow")
+        
+        -- Create a CheckBox for selection/deselection, use itemInfo.selected as the initial value and update it when the CheckBox is clicked
+        local checkBox = AceGUIDirectDeposit:Create("CheckBox")
+        checkBox:SetValue(itemInfo.selected)
+        checkBox:SetWidth(30)
+        checkBox:SetCallback("OnValueChanged", function(widget, event, value)
+            itemInfo.selected = value
+        end)
+        itemGroup:AddChild(checkBox)
+        
+        -- Create a label for the name
+        local label = AceGUIDirectDeposit:Create("Label")
+        local itemName = itemInfo.item.name
+        if isSplittable then
+            itemName = tostring(itemCount) .. " x " .. itemName
+        end
+        label:SetText(itemName)
+        label:SetWidth(220)
+        itemGroup:AddChild(label)
+        scrollFrame:AddChild(itemGroup)
+        
+        -- Create a Button for splitting if the item is splittable
+        if isSplittable then
+            local splitButton = AceGUIDirectDeposit:Create("Button")
+            splitButton:SetText("Split")
+            splitButton:SetWidth(100)
+            splitButton:SetHeight(25)
+            splitButton:SetCallback("OnClick", function(widget)
+                -- Create a new frame for the popup
+                local frame = AceGUIDirectDeposit:Create("Frame")
+                frame:SetTitle("Split Stack")
+                frame:SetLayout("Flow")
+                frame:SetWidth(200)
+                frame:SetHeight(200)
+                
+                -- Create a Slider for the number with AceGUI
+                local slider = AceGUIDirectDeposit:Create("Slider")
+                slider:SetLabel("Enter number to split:")
+                slider:SetSliderValues(1, itemCount, 1)
+                slider:SetValue(1)
+                slider:SetCallback("OnValueChanged", function(widget, event, value)
+                    local num = tonumber(value)
+                    if num then
+                        if num < 1 then
+                            num = 1
+                        elseif num > itemCount then
+                            num = itemCount
+                        end
+                        widget:SetValue(num)
+                    end
+                end)
+                slider:SetCallback("OnEnterPressed", function(widget, event, value)
+                    local num = tonumber(value)
+                    if num then
+                        if num < 1 then
+                            num = 1
+                        elseif num > itemCount then
+                            num = itemCount
+                        end
+                        widget:SetValue(num)
+                    end
+                end)
+                frame:AddChild(slider)
+            
+                -- Create a Button for the OK action
+                local okButton = AceGUIDirectDeposit:Create("Button")
+                okButton:SetText("OK")
+                okButton:SetWidth(100)
+                okButton:SetCallback("OnClick", function(widget)
+                    local value = slider.editbox:GetText()
+                    local num = tonumber(value)
+                    if num then
+                        if num < 1 then
+                            num = 1
+                        elseif num > itemCount then
+                            num = itemCount
+                        end
+                        slider:SetValue(num)
+                    end
+                    local num = slider:GetValue()
+                    if num and num >= 1 and num <= itemCount then
+                        C_Container.SplitContainerItem(itemInfo.bagId, itemInfo.slotId, num)
+                        frame:Release()
+                        DirectDepositEventFrame:CreateDepositButton()
+                    end
+                    depositedItemCount = #availableItems
+                end)
+                frame:AddChild(okButton)
+            end)
+            itemGroup:AddChild(splitButton)
+        end
+    end
+
+    local directDepositMyButton = CreateFrame("Button", "directDepositMyButton", itemFrame.frame, "UIPanelButtonTemplate")
+    directDepositGlobalButton = directDepositMyButton
+    directDepositMyButton:SetSize(100 ,100)
+    directDepositMyButton:SetPoint("BOTTOM", 0, -110)
+    directDepositMyButton:SetNormalTexture("Interface\\AddOns\\DirectDeposit\\Media\\Icons\\DirectDeposit.jpeg")
+    directDepositMyButton:SetText("Deposit")
+    directDepositMyButton:SetNormalFontObject(GameFontNormalLarge)
+    directDepositMyButton:SetHighlightFontObject(GameFontNormalLarge)
+
+    local buttonText = directDepositMyButton:GetFontString()
+    directDepositMyButton:SetNormalFontObject(GameFontNormalLarge)
+    buttonText:SetPoint("BOTTOM", directDepositMyButton, "TOP", 0, 0)
+    buttonText:SetTextColor(0, 1, 0)
+
+    directDepositMyButton:SetScript("OnClick", function()
+        PlaySoundFile("Interface\\AddOns\\DirectDeposit\\Media\\sounds\\ka-ching.mp3")
+        local depositedItem = false
+        depositedItemCount = 0
+        local delay = 0
+        depositing = true
+
+        -- deposit all available items selected for deposit
+        for _, itemInfo in ipairs(availableItems) do
+            if itemInfo.selected then
+                C_Timer.After(delay, function()
+                    local status, itemLocation = pcall(ItemLocation.CreateFromBagAndSlot, ItemLocation, itemInfo.bagId, itemInfo.slotId) -- get item location
+                    if not status then
+                        print("Error creating item location: " .. itemLocation) -- itemLocation contains the error message if status is false                    
+                    else
+                        local itemCount = C_Item.GetStackCount(itemLocation) -- get item count from item location
+                        if gbankOpen then
+                            print("Depositing " .. itemCount .. " x " .. itemInfo.item.name)
+                            C_Container.UseContainerItem(itemInfo.bagId, itemInfo.slotId)
+                            depositedItem = true
+                            depositedItemCount = depositedItemCount + 1
+                        end
+                    end
+                end)
+                delay = delay + 1 -- Increase delay by 1 second for each item
+            end
+        end
+
+        C_Timer.After(delay, function()
+            if not depositedItem then
+                print("No items to deposit.")
+            else
+                print("Thank you for your donations!")
+            end
+            for _, frame in ipairs(DirectDeposit_DepositFrame) do
+                frame:Release()
+            end
+            DirectDeposit_DepositFrame = {}
+            DirectDepositEventFrame:CreateDepositButton() -- Refresh the frame
+            depositing = false
+        end)
+    end)
+
+    table.insert(DirectDeposit_DepositFrame, itemFrame);
+    -- Register the BAG_UPDATE event
+    local eventFrame = CreateFrame("Frame")
+    eventFrame:RegisterEvent("BAG_UPDATE")
+    local timer = nil
+    eventFrame:SetScript("OnEvent", function(self, event, ...)
+        if event == "BAG_UPDATE" then
+            if itemFrame:IsShown() and not isUpdating and not depositing then
+                isUpdating = true
+                if timer then
+                    timer:Cancel()
+                end
+                timer = C_Timer.NewTimer(0.1, function()
+                    for _,frame in ipairs(DirectDeposit_DepositFrame) do
+                        frame:Release()
+                    end
+                    DirectDeposit_DepositFrame = {}
+                    DirectDepositEventFrame:CreateDepositButton() -- Refresh the frame
+                    isUpdating = false
+                end)
+            end
+        end
+    end)
 end
 
 
