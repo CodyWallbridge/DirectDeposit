@@ -18,6 +18,7 @@ local depositedItemCount = 0
 local gbankOpen = false
 
 local availableItems = {}
+local directDepositGlobalButton = nil
 
 tinsert(UISpecialFrames, DirectDepositEventFrame:GetName())
 
@@ -292,7 +293,6 @@ end
 
 -- button deposits everything from list, no handling of ranks whatsoever.
 function DirectDepositEventFrame:CreateDepositButton()
-
     -- create the frame to hold the items
     local itemFrame = AceGUIDirectDeposit:Create("Frame", "MyItemFrame")
     itemFrame:SetTitle("DirectDeposit")
@@ -312,6 +312,9 @@ function DirectDepositEventFrame:CreateDepositButton()
         end
         dd_deposit_frame_loc = {point, relativeToName, relativePoint, xOfs, yOfs}
         AceGUIDirectDeposit:Release(widget)
+        -- remove directDepositGlobalButton
+        directDepositGlobalButton:Hide()
+        directDepositGlobalButton = nil
     end)
     itemFrame:SetLayout("Fill")
 
@@ -390,7 +393,7 @@ function DirectDepositEventFrame:CreateDepositButton()
             itemName = tostring(itemCount) .. " x " .. itemName
         end
         label:SetText(itemName)
-        label:SetWidth(190)
+        label:SetWidth(220)
         itemGroup:AddChild(label)
         scrollFrame:AddChild(itemGroup)
         
@@ -466,20 +469,21 @@ function DirectDepositEventFrame:CreateDepositButton()
         end
     end
 
-    local myButton = CreateFrame("Button", "MyButton", itemFrame.frame, "UIPanelButtonTemplate")
-    myButton:SetSize(100 ,100)
-    myButton:SetPoint("BOTTOM", 0, -110)
-    myButton:SetNormalTexture("Interface\\AddOns\\DirectDeposit\\Media\\Icons\\DirectDeposit.jpeg")
-    myButton:SetText("Deposit")
-    myButton:SetNormalFontObject(GameFontNormalLarge)
-    myButton:SetHighlightFontObject(GameFontNormalLarge)
+    local directDepositMyButton = CreateFrame("Button", "directDepositMyButton", itemFrame.frame, "UIPanelButtonTemplate")
+    directDepositGlobalButton = directDepositMyButton
+    directDepositMyButton:SetSize(100 ,100)
+    directDepositMyButton:SetPoint("BOTTOM", 0, -110)
+    directDepositMyButton:SetNormalTexture("Interface\\AddOns\\DirectDeposit\\Media\\Icons\\DirectDeposit.jpeg")
+    directDepositMyButton:SetText("Deposit")
+    directDepositMyButton:SetNormalFontObject(GameFontNormalLarge)
+    directDepositMyButton:SetHighlightFontObject(GameFontNormalLarge)
 
-    local buttonText = myButton:GetFontString()
-    myButton:SetNormalFontObject(GameFontNormalLarge)
-    buttonText:SetPoint("BOTTOM", myButton, "TOP", 0, 0)
+    local buttonText = directDepositMyButton:GetFontString()
+    directDepositMyButton:SetNormalFontObject(GameFontNormalLarge)
+    buttonText:SetPoint("BOTTOM", directDepositMyButton, "TOP", 0, 0)
     buttonText:SetTextColor(0, 1, 0)
 
-    myButton:SetScript("OnClick", function()
+    directDepositMyButton:SetScript("OnClick", function()
         PlaySoundFile("Interface\\AddOns\\DirectDeposit\\Media\\sounds\\ka-ching.mp3")
         local depositedItem = false
         depositedItemCount = 0
@@ -534,7 +538,7 @@ function DirectDepositEventFrame:CreateDepositButton()
                 if timer then
                     timer:Cancel()
                 end
-                timer = C_Timer.NewTimer(0, function()
+                timer = C_Timer.NewTimer(0.1, function()
                     for _,frame in ipairs(DirectDeposit_DepositFrame) do
                         frame:Release()
                     end
