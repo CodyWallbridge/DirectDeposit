@@ -294,7 +294,7 @@ end
 -- button deposits everything from list, no handling of ranks whatsoever.
 function DirectDepositEventFrame:CreateDepositButton()
     -- create the frame to hold the items
-    local itemFrame = AceGUIDirectDeposit:Create("Frame", "MyItemFrame")
+    local itemFrame = AceGUIDirectDeposit:Create("Frame")
     itemFrame:SetTitle("DirectDeposit")
     itemFrame:SetWidth(425)
     itemFrame:SetHeight(400)
@@ -544,6 +544,7 @@ function DirectDepositEventFrame:CreateDepositButton()
                     end
                     DirectDeposit_DepositFrame = {}
                     DirectDepositEventFrame:CreateDepositButton() -- Refresh the frame
+                    print("BAG_UPDATE refresh")
                     isUpdating = false
                 end)
             end
