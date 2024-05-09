@@ -291,10 +291,12 @@ function DirectDepositEventFrame:onLoad()
     debugPrint("done onLoad")
 end
 
+local eventFrame = CreateFrame("Frame")
+eventFrame:RegisterEvent("BAG_UPDATE")
 -- button deposits everything from list, no handling of ranks whatsoever.
 function DirectDepositEventFrame:CreateDepositButton()
     -- create the frame to hold the items
-    local itemFrame = AceGUIDirectDeposit:Create("Frame", "MyItemFrame")
+    local itemFrame = AceGUIDirectDeposit:Create("Frame")
     itemFrame:SetTitle("DirectDeposit")
     itemFrame:SetWidth(425)
     itemFrame:SetHeight(400)
@@ -528,8 +530,6 @@ function DirectDepositEventFrame:CreateDepositButton()
 
     table.insert(DirectDeposit_DepositFrame, itemFrame);
     -- Register the BAG_UPDATE event
-    local eventFrame = CreateFrame("Frame")
-    eventFrame:RegisterEvent("BAG_UPDATE")
     local timer = nil
     eventFrame:SetScript("OnEvent", function(self, event, ...)
         if event == "BAG_UPDATE" then
