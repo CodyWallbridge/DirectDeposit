@@ -958,7 +958,8 @@ function DirectDepositEventFrame:CreateDonationList()
     itemsHeader:SetFontObject(GameFontNormalLarge)
     itemsHeader:SetColor(0.4, 0.6, 1) -- Change font color (light blue)
     itemsHeader:SetText("Items - " .. dd_timestamp)
-    itemsHeader:SetFullWidth(true)
+    itemsHeader:SetWidth(200)
+
     testContainer:AddChild(itemsHeader)
 
     searchBox:SetCallback("OnTextChanged", function(_, _, value)
