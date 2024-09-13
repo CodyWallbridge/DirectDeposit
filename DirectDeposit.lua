@@ -637,6 +637,22 @@ function DirectDepositEventFrame:CreateWishList()
 
     -- this does a linear search through requestedItems because requestedItems is setup in a super dumb way. changing would require significant refactoring. possibly in the future
     local function populateItems(items)
+        -- cleanup requestedItems and remove legacy items
+        for i = #requestedItems, 1, -1 do
+            local found = false
+            for _, tradeItem in pairs(items) do
+                if requestedItems[i].name == tradeItem then
+                    found = true
+                    break
+                end
+            end
+            if not found then
+                table.remove(requestedItems, i)
+            end
+        end
+
+        
+        -- go through the items and create a checkbox for each
         for id, name in pairs(items) do
             local checkbox = AceGUIDirectDeposit:Create("CheckBox")
             checkbox:SetLabel(name)
