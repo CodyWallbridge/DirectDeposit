@@ -1,7 +1,7 @@
 ## Interface: 110002
 ## Title: DirectDeposit
 ## Author: Van
-## Version: 1.8
+## Version: 1.9
 ## SavedVariablesPerCharacter: depositingItems, requestedItems, dd_timestamp, dd_deposit_frame_loc
 ## IconTexture: Interface\AddOns\DirectDeposit\Media\Icons\DirectDeposit.jpeg
 
