@@ -835,6 +835,22 @@ function DirectDepositEventFrame:CreateDonationList()
     checkboxContainer:SetLayout("Flow")
 
     local function populateItems(items)
+        local locale = GetLocale()
+        tradeGoods = DirectDeposit_TRADE_GOODS[locale]
+        -- cleanup requestedItems and remove legacy items
+        for i = #requestedItems, 1, -1 do
+            local found = false
+            for _, tradeItem in pairs(tradeGoods) do
+                if requestedItems[i].name == tradeItem then
+                    found = true
+                    break
+                end
+            end
+            if not found then
+                table.remove(requestedItems, i)
+            end
+        end
+
         for _, item in ipairs(items) do
             if item.state == true then
                 local checkbox = AceGUIDirectDeposit:Create("CheckBox")
