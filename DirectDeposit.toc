@@ -11,6 +11,9 @@ libs\LibSerialize\lib.xml
 libs\LibDeflate\lib.xml
 libs\AceComm-3.0\AceComm-3.0.xml
 libs\AceGUI-3.0\AceGUI-3.0.xml
+## X-Curse-Project-ID: 1002812
+## X-WoWI-ID: 26719
+## X-Wago-ID: b6mbMzKP
 
 Locales.lua
 DirectDeposit.lua
