@@ -1,16 +1,16 @@
-## Interface: 110002
+## Interface: 110100
 ## Title: DirectDeposit
 ## Author: Van
-## Version: 1.9.1
+## Version: 1.9.2
 ## SavedVariablesPerCharacter: depositingItems, requestedItems, dd_timestamp, dd_deposit_frame_loc
 ## IconTexture: Interface\AddOns\DirectDeposit\Media\Icons\DirectDeposit.jpeg
 
 libs\LibStub\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 libs\LibSerialize\lib.xml
 libs\LibDeflate\lib.xml
 libs\AceComm-3.0\AceComm-3.0.xml
 libs\AceGUI-3.0\AceGUI-3.0.xml
-libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 
 Locales.lua
 DirectDeposit.lua
