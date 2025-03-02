@@ -7,7 +7,7 @@ SLASH_DIRECTDEPOSIT2 = "/directdeposit"
 local selected, unselected = true, true
 local wishSelected, wishUnselected = true, true
 
-local DEBUG_MODE = true
+local DEBUG_MODE = false
 
 local DirectDeposit_DepositFrame = {};
 
