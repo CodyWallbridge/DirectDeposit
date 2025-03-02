@@ -7,7 +7,7 @@ SLASH_DIRECTDEPOSIT2 = "/directdeposit"
 local selected, unselected = true, true
 local wishSelected, wishUnselected = true, true
 
-local DEBUG_MODE = false
+local DEBUG_MODE = true
 
 local DirectDeposit_DepositFrame = {};
 
@@ -86,6 +86,52 @@ local function tprint (tbl, indent)
     end
     toprnt = toprnt .. string.rep(" ", indent-2) .. "}"
     return toprnt
+end
+
+function DirectDepositEventFrame:DirectDepositRemoveOldItems()
+    local tradeGoods
+    local locale = GetLocale()
+
+    -- if there ends up being multiple classic clients, this link has all the enums for the different versions
+    -- https://wowpedia.fandom.com/wiki/WOW_PROJECT_ID
+    IsClassic = WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE
+    if IsClassic then
+        locale = "CataClassic"
+    end
+    
+    function merge_tables(table1, table2)
+        local result = {}
+        local name_set = {}
+        
+        local function insert_into_result(t)
+            for id, name in pairs(t) do
+                if not name_set[name] then
+                    result[id] = name
+                    name_set[name] = true
+                end
+            end
+        end
+        insert_into_result(table1)
+        insert_into_result(table2)
+    
+        return result
+    end
+
+    tradeGoods = merge_tables(DirectDeposit_TRADE_GOODS[locale], DirectDeposit_CONSUMABLES[locale])
+
+    -- go through requestedItems and depositingItems and if the item does not exist in tradeGoods, remove it from the list
+    for i = #requestedItems, 1, -1 do
+        local found = false
+        for _, tradeItem in pairs(tradeGoods) do
+            if requestedItems[i].name == tradeItem then
+                found = true
+                break
+            end
+        end
+        if not found then
+            table.remove(requestedItems, i)
+        end
+    end
 end
 
 function DirectDepositEventFrame:export()
@@ -315,7 +361,9 @@ function DirectDepositEventFrame:CreateDepositButton()
         dd_deposit_frame_loc = {point, relativeToName, relativePoint, xOfs, yOfs}
         AceGUIDirectDeposit:Release(widget)
         -- remove directDepositGlobalButton
-        directDepositGlobalButton:Hide()
+        if directDepositGlobalButton and directDepositGlobalButton:IsShown() then
+            directDepositGlobalButton:Hide()
+        end
         directDepositGlobalButton = nil
     end)
     itemFrame:SetLayout("Fill")
@@ -332,8 +380,16 @@ function DirectDepositEventFrame:CreateDepositButton()
     tinsert(UISpecialFrames, "itemFrame")
 
     availableItems = {}
+    AllBagIndexes = {
+        Enum.BagIndex.Backpack,
+        Enum.BagIndex.Bag_1,
+        Enum.BagIndex.Bag_2,
+        Enum.BagIndex.Bag_3,
+        Enum.BagIndex.Bag_4,
+        Enum.BagIndex.ReagentBag
+    }
     -- determine items available to deposit
-    for bag = BACKPACK_CONTAINER, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
+    for _, bag in ipairs(AllBagIndexes) do
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local itemLink = C_Container.GetContainerItemLink(bag, slot)
             if itemLink then
@@ -540,7 +596,9 @@ function DirectDepositEventFrame:CreateDepositButton()
                 end
                 timer = C_Timer.NewTimer(0.1, function()
                     for _,frame in ipairs(DirectDeposit_DepositFrame) do
-                        frame:Release()
+                        if frame and frame.Release then
+                            frame:Release()
+                        end
                     end
                     DirectDeposit_DepositFrame = {}
                     DirectDepositEventFrame:CreateDepositButton() -- Refresh the frame
@@ -563,6 +621,7 @@ function DirectDepositEventFrame:OnEvent(event, ...)
         if(text == "DirectDeposit") then
             debugPrint("direct deposit loaded")
             DirectDepositEventFrame:LoadSavedVariables();
+            DirectDepositEventFrame:DirectDepositRemoveOldItems();
 
             if not SerializerDirectDeposit then
                 DirectDepositEventFrame:onLoad();
@@ -598,6 +657,13 @@ DirectDepositEventFrame:SetScript("OnEvent", DirectDepositEventFrame.OnEvent);
 function DirectDepositEventFrame:CreateWishList()
     local tradeGoods
     local locale = GetLocale()
+
+    -- if there ends up being multiple classic clients, this link has all the enums for the different versions
+    -- https://wowpedia.fandom.com/wiki/WOW_PROJECT_ID
+    IsClassic = WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE
+    if IsClassic then
+        locale = "CataClassic"
+    end
     
     function merge_tables(table1, table2)
         local result = {}
@@ -645,9 +711,6 @@ function DirectDepositEventFrame:CreateWishList()
                     found = true
                     break
                 end
-            end
-            if not found then
-                table.remove(requestedItems, i)
             end
         end
 
@@ -836,6 +899,13 @@ function DirectDepositEventFrame:CreateDonationList()
 
     local function populateItems(items)
         local locale = GetLocale()
+
+        -- if there ends up being multiple classic clients, this link has all the enums for the different versions
+        -- https://wowpedia.fandom.com/wiki/WOW_PROJECT_ID
+        IsClassic = WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE
+        if IsClassic then
+            locale = "CataClassic"
+        end
         tradeGoods = DirectDeposit_TRADE_GOODS[locale]
         -- cleanup requestedItems and remove legacy items
         for i = #requestedItems, 1, -1 do
