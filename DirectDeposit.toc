@@ -1,4 +1,4 @@
-## Interface: 110100, 40402
+## Interface: 120000, 40402
 ## Title: DirectDeposit
 ## Author: Van
 ## Version: 1.9.2
@@ -19,3 +19,4 @@ Locales.lua
 DirectDeposit.lua
 
 # /run print((select(4, GetBuildInfo())));
+
