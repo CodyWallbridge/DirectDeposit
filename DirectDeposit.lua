@@ -1,6 +1,6 @@
-DirectDepositEventFrame = CreateFrame("frame", "DirectDeposit Frame");
-myPrefixDirectDeposit = "DirectDeposit121";
-MyAddOn_CommsDirectDeposit = {};
+local DirectDepositEventFrame = CreateFrame("frame", "DirectDeposit Frame");
+local myPrefixDirectDeposit = "DirectDeposit121";
+local MyAddOn_CommsDirectDeposit = {};
 SLASH_DIRECTDEPOSIT1 = "/dd"
 SLASH_DIRECTDEPOSIT2 = "/directdeposit"
 
@@ -22,7 +22,7 @@ local directDepositGlobalButton = nil
 
 tinsert(UISpecialFrames, DirectDepositEventFrame:GetName())
 
-function SlashCmdList.DIRECTDEPOSIT(msg, editbox)
+function SlashCmdList.DIRECTDEPOSIT(msg)
     local lowerMsg = strlower(strtrim(msg))
     -- if they enter edit, then check if they are an officer and open the edit window
     if lowerMsg == "edit" then
@@ -335,52 +335,6 @@ function DirectDepositEventFrame:onLoad()
 	MyAddOn_CommsDirectDeposit.Prefix = myPrefixDirectDeposit;
 	MyAddOn_CommsDirectDeposit:Init();
     debugPrint("done onLoad")
-end
-
-function DirectDepositEventFrame:DirectDepositRemoveOldItems()
-    local tradeGoods
-    local locale = GetLocale()
-
-    -- if there ends up being multiple classic clients, this link has all the enums for the different versions
-    -- https://wowpedia.fandom.com/wiki/WOW_PROJECT_ID
-    IsClassic = WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE
-    if IsClassic then
-        locale = "CataClassic"
-    end
-    
-    function merge_tables(table1, table2)
-        local result = {}
-        local name_set = {}
-        
-        local function insert_into_result(t)
-            for id, name in pairs(t) do
-                if not name_set[name] then
-                    result[id] = name
-                    name_set[name] = true
-                end
-            end
-        end
-        insert_into_result(table1)
-        insert_into_result(table2)
-    
-        return result
-    end
-
-    tradeGoods = merge_tables(DirectDeposit_TRADE_GOODS[locale], DirectDeposit_CONSUMABLES[locale])
-
-    -- go through requestedItems and depositingItems and if the item does not exist in tradeGoods, remove it from the list
-    for i = #requestedItems, 1, -1 do
-        local found = false
-        for _, tradeItem in pairs(tradeGoods) do
-            if requestedItems[i].name == tradeItem then
-                found = true
-                break
-            end
-        end
-        if not found then
-            table.remove(requestedItems, i)
-        end
-    end
 end
 
 local eventFrame = CreateFrame("Frame")
