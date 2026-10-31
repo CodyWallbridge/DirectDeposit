@@ -20,6 +20,29 @@ local gbankOpen = false
 local availableItems = {}
 local directDepositGlobalButton = nil
 
+local function getCatalogItems()
+    local locale = GetLocale()
+    if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
+        locale = "CataClassic"
+    end
+
+    local result = {}
+    local names = {}
+    for _, catalog in ipairs({
+        DirectDeposit_TRADE_GOODS[locale] or {},
+        DirectDeposit_CONSUMABLES[locale] or {},
+        DirectDeposit_CUSTOM_ITEMS[locale] or {},
+    }) do
+        for id, name in pairs(catalog) do
+            if not names[name] then
+                result[id] = name
+                names[name] = true
+            end
+        end
+    end
+    return result
+end
+
 tinsert(UISpecialFrames, DirectDepositEventFrame:GetName())
 
 function SlashCmdList.DIRECTDEPOSIT(msg)
@@ -89,35 +112,7 @@ local function tprint (tbl, indent)
 end
 
 function DirectDepositEventFrame:DirectDepositRemoveOldItems()
-    local tradeGoods
-    local locale = GetLocale()
-
-    -- if there ends up being multiple classic clients, this link has all the enums for the different versions
-    -- https://wowpedia.fandom.com/wiki/WOW_PROJECT_ID
-    IsClassic = WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE
-    if IsClassic then
-        locale = "CataClassic"
-    end
-    
-    function merge_tables(table1, table2)
-        local result = {}
-        local name_set = {}
-        
-        local function insert_into_result(t)
-            for id, name in pairs(t) do
-                if not name_set[name] then
-                    result[id] = name
-                    name_set[name] = true
-                end
-            end
-        end
-        insert_into_result(table1)
-        insert_into_result(table2)
-    
-        return result
-    end
-
-    tradeGoods = merge_tables(DirectDeposit_TRADE_GOODS[locale], DirectDeposit_CONSUMABLES[locale])
+    local tradeGoods = getCatalogItems()
 
     -- go through requestedItems and depositingItems and if the item does not exist in tradeGoods, remove it from the list
     for i = #requestedItems, 1, -1 do
@@ -393,7 +388,7 @@ function DirectDepositEventFrame:CreateDepositButton()
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local itemLink = C_Container.GetContainerItemLink(bag, slot)
             if itemLink then
-                local itemName = GetItemInfo(itemLink)
+                local itemName = C_Item.GetItemInfo(itemLink)
                 for _, item in ipairs(depositingItems) do
                     if item.name == itemName and item.state == true then
                         local linkChanged = (itemLink:gsub("|", "||") )
@@ -472,15 +467,15 @@ function DirectDepositEventFrame:CreateDepositButton()
                 -- Create a Slider for the number with AceGUI
                 local slider = AceGUIDirectDeposit:Create("Slider")
                 slider:SetLabel("Enter number to split:")
-                slider:SetSliderValues(1, itemCount, 1)
+                slider:SetSliderValues(1, itemCount - 1, 1)
                 slider:SetValue(1)
                 slider:SetCallback("OnValueChanged", function(widget, event, value)
                     local num = tonumber(value)
                     if num then
                         if num < 1 then
                             num = 1
-                        elseif num > itemCount then
-                            num = itemCount
+                        elseif num >= itemCount then
+                            num = itemCount - 1
                         end
                         widget:SetValue(num)
                     end
@@ -490,8 +485,8 @@ function DirectDepositEventFrame:CreateDepositButton()
                     if num then
                         if num < 1 then
                             num = 1
-                        elseif num > itemCount then
-                            num = itemCount
+                        elseif num >= itemCount then
+                            num = itemCount - 1
                         end
                         widget:SetValue(num)
                     end
@@ -508,16 +503,43 @@ function DirectDepositEventFrame:CreateDepositButton()
                     if num then
                         if num < 1 then
                             num = 1
-                        elseif num > itemCount then
-                            num = itemCount
+                        elseif num >= itemCount then
+                            num = itemCount - 1
                         end
                         slider:SetValue(num)
                     end
                     local num = slider:GetValue()
-                    if num and num >= 1 and num <= itemCount then
+                    if num and num >= 1 and num < itemCount then
+                        local destinationBag, destinationSlot
+                        local splitBags = {
+                            Enum.BagIndex.Backpack,
+                            Enum.BagIndex.Bag_1,
+                            Enum.BagIndex.Bag_2,
+                            Enum.BagIndex.Bag_3,
+                            Enum.BagIndex.Bag_4,
+                            Enum.BagIndex.ReagentBag
+                        }
+                        for _, bag in ipairs(splitBags) do
+                            for slot = 1, C_Container.GetContainerNumSlots(bag) do
+                                if not C_Container.GetContainerItemLink(bag, slot) then
+                                    destinationBag, destinationSlot = bag, slot
+                                    break
+                                end
+                            end
+                            if destinationSlot then
+                                break
+                            end
+                        end
+
+                        if not destinationSlot then
+                            print("No free bag slot available to split this stack.")
+                            frame:Release()
+                            return
+                        end
+
                         C_Container.SplitContainerItem(itemInfo.bagId, itemInfo.slotId, num)
+                        C_Container.PickupContainerItem(destinationBag, destinationSlot)
                         frame:Release()
-                        DirectDepositEventFrame:CreateDepositButton()
                     end
                     depositedItemCount = #availableItems
                 end)
@@ -655,35 +677,7 @@ DirectDepositEventFrame:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_HIDE")
 DirectDepositEventFrame:SetScript("OnEvent", DirectDepositEventFrame.OnEvent);
 
 function DirectDepositEventFrame:CreateWishList()
-    local tradeGoods
-    local locale = GetLocale()
-
-    -- if there ends up being multiple classic clients, this link has all the enums for the different versions
-    -- https://wowpedia.fandom.com/wiki/WOW_PROJECT_ID
-    IsClassic = WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE
-    if IsClassic then
-        locale = "CataClassic"
-    end
-    
-    function merge_tables(table1, table2)
-        local result = {}
-        local name_set = {}
-        
-        local function insert_into_result(t)
-            for id, name in pairs(t) do
-                if not name_set[name] then
-                    result[id] = name
-                    name_set[name] = true
-                end
-            end
-        end
-        insert_into_result(table1)
-        insert_into_result(table2)
-    
-        return result
-    end
-
-    tradeGoods = merge_tables(DirectDeposit_TRADE_GOODS[locale], DirectDeposit_CONSUMABLES[locale])
+    local tradeGoods = getCatalogItems()
 
     -- Create a separate container for the checkboxes
     local checkboxContainer = AceGUIDirectDeposit:Create("SimpleGroup")
@@ -898,15 +892,7 @@ function DirectDepositEventFrame:CreateDonationList()
     checkboxContainer:SetLayout("Flow")
 
     local function populateItems(items)
-        local locale = GetLocale()
-
-        -- if there ends up being multiple classic clients, this link has all the enums for the different versions
-        -- https://wowpedia.fandom.com/wiki/WOW_PROJECT_ID
-        IsClassic = WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE
-        if IsClassic then
-            locale = "CataClassic"
-        end
-        tradeGoods = DirectDeposit_TRADE_GOODS[locale]
+        local tradeGoods = getCatalogItems()
         -- cleanup requestedItems and remove legacy items
         for i = #requestedItems, 1, -1 do
             local found = false
