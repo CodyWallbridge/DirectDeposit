@@ -3015,3 +3015,28 @@ DirectDeposit_CONSUMABLES = {
     ["zhCN"] = {},
     ["CataClassic"] = {},
 }
+
+DirectDeposit_CUSTOM_ITEMS = {
+    ["enUS"] = {
+        [56049] = "Mysterious Rock",
+        [56035] = "Colorful Rock",
+        [5429] = "A Pretty Rock",
+        [140751] = "Pretty Shell",
+        [140756] = "Baby's Doll",
+        [140755] = "Life-Like Magistrix Doll",
+        [140750] = "Conch",
+        [143717] = "Chipped Tea Cup",
+        [140752] = "Princess Tea Party Invitation",
+        [38264] = "A Very Pretty Rock",
+        [45999] = "Worthless Piece of White Glass",
+        [130207] = "Bragging Note",
+        [130206] = "Informative Note",
+        [130205] = "Aggravating note",
+        [153227] = "Pressed Chromatic Lily",
+        [18640] = "Happy Fun Rock",
+        [18663] = "Heavy Leather Ball",
+        [140753] = "Half Eaten Candy Bar",
+        [140754] = "Soggy Waffle Cone",
+        [147669] = "Half an Animal Biscuit",
+    },
+}
