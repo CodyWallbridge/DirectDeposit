@@ -24,6 +24,8 @@ local function getCatalogItems()
     local locale = GetLocale()
     if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
         locale = "CataClassic"
+    elseif locale == "enGB" then
+        locale = "enUS"
     end
 
     local result = {}
@@ -678,6 +680,10 @@ DirectDepositEventFrame:SetScript("OnEvent", DirectDepositEventFrame.OnEvent);
 
 function DirectDepositEventFrame:CreateWishList()
     local tradeGoods = getCatalogItems()
+    if not next(tradeGoods) then
+        print("DirectDeposit: No item catalog is available for your game locale (" .. GetLocale() .. ").")
+        return
+    end
 
     -- Create a separate container for the checkboxes
     local checkboxContainer = AceGUIDirectDeposit:Create("SimpleGroup")
