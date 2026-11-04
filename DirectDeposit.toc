@@ -18,4 +18,4 @@ libs\AceGUI-3.0\AceGUI-3.0.xml
 Locales.lua
 DirectDeposit.lua
 
-# /run print((select(4, GetBuildInfo())));
+# /run print((select(4, GetBuildInfo()))); 
