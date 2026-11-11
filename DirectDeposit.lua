@@ -20,6 +20,12 @@ local gbankOpen = false
 local availableItems = {}
 local directDepositGlobalButton = nil
 
+if not _G.SetDesaturation then
+    _G.SetDesaturation = function(texture, desaturated)
+        texture:SetDesaturated(desaturated)
+    end
+end
+
 local function getCatalogItems()
     local locale = GetLocale()
     if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
@@ -434,6 +440,7 @@ function DirectDepositEventFrame:CreateDepositButton()
         
         -- Create a CheckBox for selection/deselection, use itemInfo.selected as the initial value and update it when the CheckBox is clicked
         local checkBox = AceGUIDirectDeposit:Create("CheckBox")
+        checkBox:SetLabel("")
         checkBox:SetValue(itemInfo.selected)
         checkBox:SetWidth(30)
         checkBox:SetCallback("OnValueChanged", function(widget, event, value)
@@ -555,7 +562,7 @@ function DirectDepositEventFrame:CreateDepositButton()
     directDepositGlobalButton = directDepositMyButton
     directDepositMyButton:SetSize(100 ,100)
     directDepositMyButton:SetPoint("BOTTOM", 0, -110)
-    directDepositMyButton:SetNormalTexture("Interface\\AddOns\\DirectDeposit\\Media\\Icons\\DirectDeposit.jpeg")
+    directDepositMyButton:SetNormalTexture("Interface\\AddOns\\DirectDeposit\\Media\\Icons\\DirectDeposit.tga")
     directDepositMyButton:SetText("Deposit")
     directDepositMyButton:SetNormalFontObject(GameFontNormalLarge)
     directDepositMyButton:SetHighlightFontObject(GameFontNormalLarge)
@@ -898,66 +905,75 @@ function DirectDepositEventFrame:CreateDonationList()
     checkboxContainer:SetLayout("Flow")
 
     local function populateItems(items)
-        local tradeGoods = getCatalogItems()
-        -- cleanup requestedItems and remove legacy items
-        for i = #requestedItems, 1, -1 do
-            local found = false
-            for _, tradeItem in pairs(tradeGoods) do
-                if requestedItems[i].name == tradeItem then
-                    found = true
-                    break
-                end
-            end
-            if not found then
-                table.remove(requestedItems, i)
+        local requestedLookup = {}
+        for _, requestedItem in ipairs(requestedItems) do
+            if requestedItem.state == true then
+                requestedLookup[requestedItem.name] = true
             end
         end
 
         for _, item in ipairs(items) do
-            if item.state == true then
-                local checkbox = AceGUIDirectDeposit:Create("CheckBox")
-                checkbox:SetLabel(item.name)
+            local itemName = item.name
+            local checkbox = AceGUIDirectDeposit:Create("CheckBox")
+            local isRequested = requestedLookup[itemName]
+            checkbox:SetLabel(itemName)
 
-                -- Find the item in depositingItems and use its state as the initial value
-                local depositingItem = findItem(item.name)
-                if depositingItem then
-                    checkbox:SetValue(depositingItem.state)
+            local depositingItem = findItem(itemName)
+            checkbox:SetValue(depositingItem and depositingItem.state == true or false)
+
+            if not isRequested then
+                checkbox.text:SetTextColor(0.6, 0.6, 0.6)
+            end
+
+            checkbox:SetCallback("OnValueChanged", function(_, _, value)
+                local savedItem = findItem(itemName)
+                if savedItem then
+                    savedItem.state = value
                 else
-                    checkbox:SetValue(false)
+                    table.insert(depositingItems, {name = itemName, state = value})
                 end
 
-                checkbox:SetCallback("OnValueChanged", function(_, _, value)
-                    -- Find the item in depositingItems
-                    local depositingItem = findItem(item.name)
-                    if depositingItem then
-                        -- If the item is found, update its state
-                        depositingItem.state = value
-                    else
-                        -- If the item is not found, add it to depositingItems with the new state
-                        table.insert(depositingItems, {name = item.name, state = value})
-                    end
-                end)
-                checkboxContainer:AddChild(checkbox)
-            end
+                if not isRequested then
+                    checkbox.text:SetTextColor(0.6, 0.6, 0.6)
+                end
+            end)
+
+            checkboxContainer:AddChild(checkbox)
         end
     end
 
     local function filterItems(searchTerm)
+        local names = {}
+
+        for _, item in ipairs(requestedItems) do
+            if item.state == true then
+                names[item.name] = true
+            end
+        end
+
+        for _, item in ipairs(depositingItems) do
+            if item.state == true then
+                names[item.name] = true
+            end
+        end
+
         local depositingItemsLookup = {}
         for _, item in ipairs(depositingItems) do
             depositingItemsLookup[item.name] = item
         end
 
         local filteredItems = {}
-        for _, item in ipairs(requestedItems) do
-            if string.find(item.name:lower(), searchTerm:lower()) then
-                local depItem = depositingItemsLookup[item.name]
-                local state = depItem and depItem.state or false
-                if (state and selected) or (not state and unselected) then
-                    table.insert(filteredItems, item)
+        for name in pairs(names) do
+            if string.find(name:lower(), searchTerm:lower()) then
+                local savedItem = depositingItemsLookup[name]
+                local isSelected = savedItem and savedItem.state == true or false
+
+                if (isSelected and selected) or (not isSelected and unselected) then
+                    table.insert(filteredItems, {name = name})
                 end
             end
         end
+
         return filteredItems
     end
 
@@ -1056,6 +1072,12 @@ function DirectDepositEventFrame:CreateDonationList()
 
     testContainer:AddChild(itemsHeader)
 
+    local legend = AceGUIDirectDeposit:Create("Label")
+    legend:SetText("Gray items are saved but no longer requested.")
+    legend:SetColor(0.6, 0.6, 0.6)
+    legend:SetFullWidth(true)
+    testContainer:AddChild(legend)
+
     searchBox:SetCallback("OnTextChanged", function(_, _, value)
         checkboxContainer:ReleaseChildren()
 
@@ -1065,7 +1087,7 @@ function DirectDepositEventFrame:CreateDonationList()
         scrollContainer:DoLayout()
     end)
 
-    populateItems(requestedItems)
+    populateItems(filterItems(searchBox:GetText()))
     scrollContainer:AddChild(checkboxContainer)
     testContainer:AddChild(scrollContainer)
 end

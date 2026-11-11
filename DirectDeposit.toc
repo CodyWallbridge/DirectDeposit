@@ -3,7 +3,7 @@
 ## Author: Van
 ## Version: 1.9.7
 ## SavedVariablesPerCharacter: depositingItems, requestedItems, dd_timestamp, dd_deposit_frame_loc
-## IconTexture: Interface\AddOns\DirectDeposit\Media\Icons\DirectDeposit.jpeg
+## IconTexture: Interface\AddOns\DirectDeposit\Media\Icons\DirectDeposit.tga
 ## X-Curse-Project-ID: 1002812
 ## X-WoWI-ID: 26719
 ## X-Wago-ID: b6mbMzKP
